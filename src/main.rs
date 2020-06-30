@@ -44,12 +44,13 @@ fn main() {
     };
 
     let world = init_world();                                                                                   //generate world
-    let mut camera_coords: (isize, isize) = (128,-128);                                                             //set camera location
+    let mut player_coords: (isize, isize) = (128,-128);                                                         //set player location
+    let mut camera_coords: (isize, isize) = (128,-128);                                                         //set camera location
 
     event_loop.run(move |event, _, control_flow| {                                                              //start game loop
-        let frame_start = clock_ticks::precise_time_s();                                                      //get current loop start time
+        let frame_start = clock_ticks::precise_time_s();                                                        //get current loop start time
         if let Event::RedrawRequested(_) = event {                                                              //if redraw requested
-            draw(get_screen(&world, camera_coords), pixels.get_frame());                                        //get screen then render screen
+            draw(render_screen(&world, player_coords, camera_coords), pixels.get_frame());                                     //get screen then render screen
             if pixels                                                                                           //if rendering error
                 .render()                                                                                                       
                 .map_err(|e| error!("pixels.render() failed: {}", e))
@@ -59,7 +60,7 @@ fn main() {
             }                
             frames+=1;                                                                                          //inc this seconds frame counter
 
-            print!("\x1B[2J\x1B[1;1H{} FPS",fps);                                                               //print debug
+            print!("\x1B[2J\x1B[1;1H{} FPS\nPLAYER: {:?}\nCAMERA {:?}",fps, player_coords, camera_coords);      //print debug
             if (clock_ticks::precise_time_s() - fps_time) >= 1.0 {                                              //if second has passed since last second
                 fps = frames;                                                                                   //fps = this seconds frames
                 fps_time = clock_ticks::precise_time_s();                                                       //reset second time
@@ -79,16 +80,16 @@ fn main() {
             }
 
             if input.key_held(VirtualKeyCode::Up) {
-                camera_coords.1+=5;
+                player_coords.1+=5;
             }
             if input.key_held(VirtualKeyCode::Down) {
-                camera_coords.1-=5;
+                player_coords.1-=5;
             }
             if input.key_held(VirtualKeyCode::Left) {
-                camera_coords.0-=5;
+                player_coords.0-=5;
             }
             if input.key_held(VirtualKeyCode::Right) {
-                camera_coords.0+=5;
+                player_coords.0+=5;
             }
 
             if let Some(factor) = input.scale_factor_changed() {                                                //if window dimensions changed
@@ -100,6 +101,7 @@ fn main() {
             }
 
             //do world updates
+            update_camera(&mut camera_coords, player_coords);
             window.request_redraw();                                                                            //request frame redraw
         }
     });
@@ -112,22 +114,22 @@ struct Chunk {                      //world chunk object
 }
 
 impl Chunk {
-    fn gen_chunk(chunk_coords: (isize,isize)) -> Self{                                          //generates new chunk with random color
-        let mut data = vec![vec![Cell::new((0,0), [0;4]); CHUNK_WIDTH]; CHUNK_HEIGHT];          //generate black chunk
-        let mut rng = rand::thread_rng();                                                       //get rng handle
-        let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                                           //generate random color values
-        for y in 0..data.len() {                                                                //for y in data vec
-            for x in 0..data[y].len() {                                                         //for x in y
-                data[y][x] = Cell::new((x as u8, y as u8),rgba);                                //update color
+    fn gen_chunk(chunk_coords: (isize,isize)) -> Self{                          //generates new chunk with random color
+        let mut data = vec![vec![Cell::new([0;4]); CHUNK_WIDTH]; CHUNK_HEIGHT]; //generate black chunk
+        let mut rng = rand::thread_rng();                                       //get rng handle
+        let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                           //generate random color values
+        for y in 0..data.len() {                                                //for y in data vec
+            for x in 0..data[y].len() {                                         //for x in y
+                data[y][x] = Cell::new(rgba);                                   //update color
             }
         }
         //BLACK BOX
-        for y in 0..CHUNK_HEIGHT/25 {                                                           //creates little black box to show upper left of chunk
+        for y in 0..CHUNK_HEIGHT/25 {                                           //creates little black box to show upper left of chunk
             for x in 0..CHUNK_WIDTH/25 {
                 data[y][x].data.rgba = [0;4];
             }
         } 
-        Self{                                                                                   //return instance of chunk
+        Self{                                                                   //return instance of chunk
             chunk_coords,
             data
         }
@@ -137,14 +139,12 @@ impl Chunk {
 
 #[derive(Clone)]
 struct Cell {                   //chunk cell data
-    local_coords: (u8,u8),      //coordinates within chunk
     data: Particle,             //cell particle data
 }
 
 impl Cell {
-    fn new(local_coords: (u8,u8), rgba: [u8; 4]) -> Self {  //generates a new cell with specified particle color
+    fn new(rgba: [u8; 4]) -> Self {  //generates a new cell with specified particle color
         Self {
-            local_coords,
             data: Particle::new(rgba),
         }
     }
@@ -181,6 +181,36 @@ fn init_world() -> Vec<Vec<Chunk>> {                                            
 
 
 
+//checks render distance and loads/unloads chunks as needed
+//should really make it keep/load chunks from file and only gen if new
+fn do_gen(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)){
+    //figure out what chunk camera in
+    //check distance to edge of render
+    //if too far
+        //unrender
+    //if too close
+        //gen chunks at that edge
+}
+
+
+
+//updates camera position based off player coords
+fn update_camera(camera_coords: &mut (isize,isize), player_coords: (isize, isize)) {
+    let distance_x = player_coords.0 - camera_coords.0;         //calc x coord distance
+    let distance_y = player_coords.1 - camera_coords.1;         //calc y coord distance
+    let move_cam = |distance, camera: &mut isize| {             //closure that handles moving camera
+        if distance < 25 && distance > -25 && distance != 0 {   //if camera distance less than 25px from player and not on player
+            if distance >= 0 {*camera+=1}                       //move 1px positive if positive
+            else {*camera-=1}                                   //move 1px neg if neg
+        } 
+        else {*camera+=distance/25}                             //if farther than 25px move distance/25
+    };
+    move_cam(distance_x, &mut camera_coords.0);                 //move camera x
+    move_cam(distance_y, &mut camera_coords.1);                 //move camera y
+}
+
+
+
 //draws current frame
 fn draw(screen: Vec<[u8;4]>, frame: &mut [u8]) {                
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {   //for spot in frame
@@ -189,32 +219,52 @@ fn draw(screen: Vec<[u8;4]>, frame: &mut [u8]) {
 }
 
 
+//temp function that renders block at target
+fn render_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camera_coords: (isize, isize), size: isize, color: [u8;4]) {
+    let screen_x = (SCREEN_WIDTH/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
+    let screen_y = (SCREEN_HEIGHT/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
+    for y in screen_y-size..screen_y+size {                                             //for pixel in y range
+        for x in screen_x-size..screen_x+size {                                         //for pixel in x range
+            match screen.get(y as usize) {                                              //attempt y index
+                Some(py) => match py.get(x as usize) {                                  //if valid y index attempt x index
+                    Some(_) => screen[y as usize][x as usize] = color,                  //if valid x index draw pixel
+                    None => ()
+                },
+                None => ()
+            }
+        }
+    } 
+    
+}
+
 
 //gets current frame to draw
-fn get_screen(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<[u8;4]> {
-    let screen = get_visible(world,camera_coords);                  //gets visible pixels from world as 2d vec
-    let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);    //creates black 1d vec
-    let mut i = 0;                                                  //pixel index counter                           
-    for pixel_y in screen {                                         //for y layer in visible pixels
-        for pixel_x in pixel_y {                                    //for x in y layer
-            screen_1d[i] = pixel_x;                                 //map to the id pixel index
-            i+=1;                                                   //inc index
+fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_coords: (isize, isize)) -> Vec<[u8;4]> {
+    let mut screen = get_visible(world,camera_coords);                  //gets visible pixels from world as 2d vec
+    render_block(&mut screen, camera_coords, camera_coords, 5, [255;4]);//render camera
+    render_block(&mut screen, player_coords, camera_coords, 5, [0;4]);  //render player
+    let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);        //creates black 1d vec
+    let mut i = 0;                                                      //pixel index counter                           
+    for pixel_y in screen {                                             //for y layer in visible pixels
+        for pixel_x in pixel_y {                                        //for x in y layer
+            screen_1d[i] = pixel_x;                                     //map to the id pixel index
+            i+=1;                                                       //inc index
         }
     }
-    screen_1d                                                       //return 1d screen
+    screen_1d                                                           //return 1d screen
 }
 
 
 
 fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Vec<[u8;4]>> {
-    let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                    //creates black 2d vec for screen
-    for gen_chunk_y in world{                                                                           //for chunk layer
-        for gen_chunk_x in gen_chunk_y{                                                                 //for chunk in layer
-            for local_y in &gen_chunk_x.data{                                                           //for local layer in chunk
-                for local_x in local_y{                                                                 //for cell in local layer
-                    let world_coords = get_world_coords(gen_chunk_x.chunk_coords, local_x.local_coords);//get world coordinates from 0,0
-                    match check_visible(world_coords, camera_coords){                                   //check if pixel visible from camera
-                        Some((pixel_x,pixel_y)) => screen[pixel_y][pixel_x] = local_x.data.rgba,        //if visible place pixel on screen
+    let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                                //creates black 2d vec for screen
+    for gen_chunk_y in world{                                                                                       //for chunk layer
+        for gen_chunk_x in gen_chunk_y{                                                                             //for chunk in layer
+            for (local_y_coord, local_y) in gen_chunk_x.data.iter().enumerate(){                                    //for local layer in chunk
+                for (local_x_coord, local_x) in local_y.iter().enumerate(){                                         //for cell in local layer
+                    let world_coords = get_world_coords(gen_chunk_x.chunk_coords, (local_x_coord, local_y_coord));  //get world coordinates from 0,0
+                    match check_visible(world_coords, camera_coords){                                               //check if pixel visible from camera
+                        Some((pixel_x,pixel_y)) => screen[pixel_y][pixel_x] = local_x.data.rgba,                    //if visible place pixel on screen
                         None => ()
                     } 
                 }
@@ -226,7 +276,7 @@ fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Ve
  
 
 //calculates world coordinates based off chunk and local coords
-fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (u8,u8)) -> (isize, isize) {
+fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (usize,usize)) -> (isize, isize) {
     let wx = world_chunk_coords.0*CHUNK_WIDTH as isize+world_local_coords.0 as isize;       //calculates x
     let wy = world_chunk_coords.1*CHUNK_HEIGHT as isize+world_local_coords.1 as isize*-1;   //calculates y                                                                  I HAVE NO IDEA WHY BUT *-1 FIXED Y AXIS CHUNK FLIP BUG
     (wx,wy)
@@ -250,7 +300,7 @@ fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> 
             else {(length/2 - distance*-1) as usize}                                                //if - coord from cam make positive and subtract from half screen len
         };
         let pixel_x = calc_position(distance_from_camera.0, SCREEN_WIDTH as isize);                 //calc x coord on screen
-        let pixel_y = SCREEN_HEIGHT-calc_position(distance_from_camera.1, SCREEN_HEIGHT as isize)-1;//calc y coord on screen                                                -1 REQUIRED TO PREVENT CRASH BUT REMOVES RIGHT PIXEL COLUMN         NEEDS SCREEN_HEIGHT- AND -1 BUT NOT 100% SURE WHY TBH              
+        let pixel_y = SCREEN_HEIGHT-calc_position(distance_from_camera.1, SCREEN_HEIGHT as isize)-1;//calc y coord on screen                                                -1 REQUIRED TO PREVENT CRASH BUT REMOVES RIGHT PIXEL COLUMN     NEEDS SCREEN_HEIGHT- AND -1 BUT NOT 100% SURE WHY TBH              
         Some((pixel_x,pixel_y))                                                                     //return position on screen
     }
 }
@@ -263,9 +313,10 @@ fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> 
 //         data: Particle
 //             rgba: [u8;4]
 
+//gen_chunk = chunk index in vec
+//world_chunk = world coordinates of chunk
+
 #[test]
 fn test_it(){
-    let world = init_world();
-    let wc = get_world_coords(world[1][0].chunk_coords,world[0][1].data[50][56].local_coords);
-    assert_eq!(wc, (0,0))
+
 }
