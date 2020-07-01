@@ -10,8 +10,10 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-const SCREEN_WIDTH: usize = 768;
-const SCREEN_HEIGHT: usize = 768;
+const SCREEN_HEIGHT: usize = 528;
+const SCREEN_WIDTH: usize = 960;
+//const ASPECT_RATIO: f32 = 9.0/16.0;
+//const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
 const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
 const GEN_RANGE: isize = 4;
@@ -165,7 +167,7 @@ impl Particle {
 }
 
 
-
+//generates starting area
 fn init_world() -> Vec<Vec<Chunk>> {                                                        //initalizes world
     let mut world: Vec<Vec<Chunk>> = Vec::new();                                            //create empty world
     let mut loaded_chunk_y = 0;                                                             //create y index counter
@@ -177,19 +179,6 @@ fn init_world() -> Vec<Vec<Chunk>> {                                            
         loaded_chunk_y+=1;                                                                  //inc y layer
     }
     world                                                                                   //return newly generated world
-}
-
-
-
-//checks render distance and loads/unloads chunks as needed
-//should really make it keep/load chunks from file and only gen if new
-fn do_gen(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)){
-    //figure out what chunk camera in
-    //check distance to edge of render
-    //if too far
-        //unrender
-    //if too close
-        //gen chunks at that edge
 }
 
 
@@ -256,6 +245,10 @@ fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_
 
 
 
+
+
+//july 3th 2pm el hogar monday
+//maps all visible pixels to screen 
 fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Vec<[u8;4]>> {
     let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                                //creates black 2d vec for screen
     for gen_chunk_y in world{                                                                                       //for chunk layer
@@ -263,10 +256,14 @@ fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Ve
             for (local_y_coord, local_y) in gen_chunk_x.data.iter().enumerate(){                                    //for local layer in chunk
                 for (local_x_coord, local_x) in local_y.iter().enumerate(){                                         //for cell in local layer
                     let world_coords = get_world_coords(gen_chunk_x.chunk_coords, (local_x_coord, local_y_coord));  //get world coordinates from 0,0
-                    match check_visible(world_coords, camera_coords){                                               //check if pixel visible from camera
-                        Some((pixel_x,pixel_y)) => screen[pixel_y][pixel_x] = local_x.data.rgba,                    //if visible place pixel on screen
-                        None => ()
-                    } 
+                    let (pixel_x, pixel_y) = check_visible(world_coords, camera_coords);                            //check if pixel visible from camera
+                    match screen.get(pixel_y) {                                                                     //attempt y index
+                        Some(py) => match py.get(pixel_x) {
+                            Some(_) => screen[pixel_y][pixel_x] =local_x.data.rgba,                                 //if valid y index attempt x index
+                            _ => (),
+                        },
+                        _ => (),
+                    }
                 }
             }
         }
@@ -283,28 +280,23 @@ fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (usi
 }
 
 
-//DOESNT RETURN + EDGE PIXELS?
-//returns pixels location on screen. returns None if pixel not visible
-fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> Option<(usize,usize)>{
-    let distance_from_camera = {                                                                    //gets (x,y) pixels +/- distance from camera
-        let distance_x = world_coords.0 - camera_coords.0;                                          //calculates x
-        let distance_y = world_coords.1 - camera_coords.1;                                          //calculates y
-        (distance_x,distance_y)
-    };
-    let make_positive = |num| if num < 0 {(num*-1) as usize} else {num as usize};                   //closure that makes distance positive value for visibility check
-    if make_positive(distance_from_camera.0) >= SCREEN_WIDTH/2                                      //if farther from camera than 1/2 of screen                             = REMOVES LEFT PIXEL COLUMN TO MAKE BUG LOOK LIKE FEATURE
-    || make_positive(distance_from_camera.1) >= SCREEN_HEIGHT/2 {None}                              //return not visible                                                    = REMOVES TOP PIXEL ROW TO MAKE BUG LOOK LIKE FEATURE
-    else {                                                                                          //else if visible
-        let calc_position = |distance: isize, length: isize| {                                      //closure that calcs target pixels position on screen 
-            if distance > 0 {(distance+length/2) as usize-1}                                        //if + coord from cam add 1/2 screen len                                -1 REQUIRED TO PREVENT CRASH BUT REMOVES BOTTOM ROW OF PIXELS
-            else {(length/2 - distance*-1) as usize}                                                //if - coord from cam make positive and subtract from half screen len
-        };
-        let pixel_x = calc_position(distance_from_camera.0, SCREEN_WIDTH as isize);                 //calc x coord on screen
-        let pixel_y = SCREEN_HEIGHT-calc_position(distance_from_camera.1, SCREEN_HEIGHT as isize)-1;//calc y coord on screen                                                -1 REQUIRED TO PREVENT CRASH BUT REMOVES RIGHT PIXEL COLUMN     NEEDS SCREEN_HEIGHT- AND -1 BUT NOT 100% SURE WHY TBH              
-        Some((pixel_x,pixel_y))                                                                     //return position on screen
-    }
-}
 
+
+fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> (usize,usize){
+    let distance_from_camera = {                                                                //gets (x,y) pixels +/- distance from camera
+        let distance_x = world_coords.0 - camera_coords.0;                                      //calculates x
+        let distance_y = world_coords.1 - camera_coords.1;                                      //calculates y
+        (distance_x,distance_y)
+    };                                                                                          //else if visible
+    let calc_position = |distance: isize, length: isize| {                                      //closure that calcs target pixels position on screen 
+        if distance > 0 {(distance+length/2) as usize}                                          //if + coord from cam add 1/2 screen len                                
+        else {(length/2 - distance*-1) as usize}                                                //if - coord from cam make positive and subtract from half screen len
+    };
+    let pixel_x = calc_position(distance_from_camera.0, SCREEN_WIDTH as isize);                 //calc x coord on screen
+    let tmp_y = calc_position(distance_from_camera.1, SCREEN_HEIGHT as isize);
+    let pixel_y = if tmp_y < SCREEN_HEIGHT {SCREEN_HEIGHT - tmp_y} else {tmp_y};                //calc y coord on screen                                                NEEDS SCREEN_HEIGHT- BUT NOT 100% SURE WHY TBH              
+    (pixel_x,pixel_y)                                                                           //return position on screen
+}
 
 //Chunk
 //    coords: (i32,i32),
