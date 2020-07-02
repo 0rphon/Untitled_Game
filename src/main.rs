@@ -230,9 +230,9 @@ fn render_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camer
 
 
 
-///draws debug text to screen
-pub fn draw_debug_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &str, font_size: f32, color: [u8;4]) {
-    let font = Font::try_from_bytes(DEBUG_FONT as &[u8]).expect("Error constructing Font"); //get font from DEBUG_FONT
+///draws raw text to screen
+pub fn draw_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &str, font_size: f32, color: [u8;4], font_data: &[u8]) {
+    let font = Font::try_from_bytes(font_data).expect("Error constructing Font");           //get font from DEBUG_FONT
     let scale = Scale::uniform(font_size);                                                  //calc font scale
     let v_metrics = font.v_metrics(scale);                                                  //calc font size
     let glyphs: Vec<_> = font                                                               // layout the glyphs in a line with 0 pixels padding
@@ -261,15 +261,15 @@ pub fn draw_debug_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), te
 
 ///renders debug text
 fn render_debug(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), camera_coords: (isize,isize), fps: usize) {
-    draw_debug_text(screen, (20,20), "DEBUG", 16.0, [255,255,255,0]);
+    draw_text(screen, (20,20), "DEBUG", 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("{} FPS", fps);
-    draw_debug_text(screen, (20,30), &s, 16.0, [255,255,255,0]);
+    draw_text(screen, (20,30), &s, 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("Player: {}, {}", player_coords.0, player_coords.1);
-    draw_debug_text(screen, (20,40), &s, 16.0, [255,255,255,0]);
+    draw_text(screen, (20,40), &s, 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("Chunk: {}, {} in {}, {}", player_coords.0 % CHUNK_WIDTH as isize, player_coords.1 % CHUNK_WIDTH as isize, player_coords.0 / CHUNK_WIDTH as isize, player_coords.1 / CHUNK_WIDTH as isize,);
-    draw_debug_text(screen, (20,50), &s, 16.0, [255,255,255,0]);
+    draw_text(screen, (20,50), &s, 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("Camera: {}, {}", camera_coords.0, camera_coords.1);
-    draw_debug_text(screen, (20,60), &s, 16.0, [255,255,255,0]);
+    draw_text(screen, (20,60), &s, 16.0, [255,255,255,0], DEBUG_FONT);
 }
 
 
@@ -277,20 +277,20 @@ fn render_debug(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), cam
 
 ///gets 1D vec of current frame to draw from 4D Vec
 fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_coords: (isize, isize), debug_flag: bool, fps: usize) -> Vec<[u8;4]> {
-    let mut screen = get_visible(world,camera_coords);                                          //gets visible pixels from world as 2d vec
-    render_block(&mut screen, camera_coords, camera_coords, 5, [255;4]);                        //render camera
-    render_block(&mut screen, player_coords, camera_coords, 5, [0;4]);                          //render player
-    if ENABLE_DEBUG && debug_flag {render_debug(&mut screen, player_coords, camera_coords, fps)}//if debug flag and debug enabled: render debug
-    draw_debug_text(&mut screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0]);     //render game title
-    let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);                                //creates black 1d vec
-    let mut i = 0;                                                                              //pixel index counter                           
-    for pixel_y in screen {                                                                     //for y layer in visible pixels
-        for pixel_x in pixel_y {                                                                //for x in y layer
-            screen_1d[i] = pixel_x;                                                             //map to the id pixel index
-            i+=1;                                                                               //inc index
+    let mut screen = get_visible(world,camera_coords);                                              //gets visible pixels from world as 2d vec
+    render_block(&mut screen, camera_coords, camera_coords, 5, [255;4]);                            //render camera
+    render_block(&mut screen, player_coords, camera_coords, 5, [0;4]);                              //render player
+    if ENABLE_DEBUG && debug_flag {render_debug(&mut screen, player_coords, camera_coords, fps)}    //if debug flag and debug enabled: render debug
+    draw_text(&mut screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], DEBUG_FONT);   //render game title
+    let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);                                    //creates black 1d vec
+    let mut i = 0;                                                                                  //pixel index counter                           
+    for pixel_y in screen {                                                                         //for y layer in visible pixels
+        for pixel_x in pixel_y {                                                                    //for x in y layer
+            screen_1d[i] = pixel_x;                                                                 //map to the id pixel index
+            i+=1;                                                                                   //inc index
         }
     }
-    screen_1d                                                                                   //return 1d screen
+    screen_1d                                                                                       //return 1d screen
 }
 
 
