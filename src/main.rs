@@ -67,7 +67,6 @@ fn main() {
             }                
             frames+=1;                                                                                          //inc this seconds frame counter
 
-            print!("\x1B[2J\x1B[1;1H{} FPS\nPLAYER: {:?}\nCAMERA {:?}",fps, player_coords, camera_coords);      //print debug
             if (clock_ticks::precise_time_s() - fps_time) >= 1.0 {                                              //if second has passed since last second
                 fps = frames;                                                                                   //fps = this seconds frames
                 fps_time = clock_ticks::precise_time_s();                                                       //reset second time
