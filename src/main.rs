@@ -17,7 +17,7 @@ const SCREEN_WIDTH: usize = 960;
 const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
 const GEN_RANGE: isize = 4;
-const TARGET_FPS: u64 = 60;
+const TARGET_FPS: u64 = 70;    //VSYNC NOT ACCURATE
 
 const GAME_TITLE: &str = "Untitled Game v0.001";
 const ENABLE_DEBUG: bool = true;
@@ -55,9 +55,9 @@ fn main() {
     let mut debug_flag = false;
 
     event_loop.run(move |event, _, control_flow| {                                                              //start game loop
-        let frame_start = clock_ticks::precise_time_s();                                                        //get current loop start time
+        let frame_start = clock_ticks::precise_time_s();                                                        //get current loop start time                           VSYNC NOT ACCURATE
         if let Event::RedrawRequested(_) = event {                                                              //if redraw requested
-            draw(render_screen(&world, player_coords, camera_coords, debug_flag, fps), pixels.get_frame());                                     //get screen then render screen
+            draw(render_screen(&world, player_coords, camera_coords, debug_flag, fps), pixels.get_frame());     //get screen then render screen
             if pixels                                                                                           //if rendering error
                 .render()                                                                                                       
                 .map_err(|e| error!("pixels.render() failed: {}", e))
@@ -74,9 +74,9 @@ fn main() {
                 frames = 0;                                                                                     //reset second frames
             }
             
-            match (frame_time).checked_sub(((clock_ticks::precise_time_s() - frame_start) * 1000000.0) as u64) {//if frame took less than target fps time
-                Some(i) => {thread::sleep(time::Duration::from_micros(i))}                                      //sleep remainder
-                None    => {}                                                                                   //else pass
+            match (frame_time).checked_sub(((clock_ticks::precise_time_s() - frame_start) * 1000000.0) as u64) {//if frame took less than target fps time               VSYNC NOT ACCURATE
+                Some(i) => {thread::sleep(time::Duration::from_micros(i))}                                      //sleep remainder                                       VSYNC NOT ACCURATE
+                None    => {}                                                                                   //else pass                                             VSYNC NOT ACCURATE
             }
         }
         
@@ -98,8 +98,8 @@ fn main() {
             if input.key_held(VirtualKeyCode::Right) {
                 player_coords.0+=5;
             }
-            if input.key_pressed(VirtualKeyCode::F3) {
-                debug_flag = !debug_flag;
+            if input.key_pressed(VirtualKeyCode::F3) {                                                          //if f3 pressed
+                debug_flag = !debug_flag;                                                                       //toggle debug
             }
 
             if let Some(factor) = input.scale_factor_changed() {                                                //if window dimensions changed
@@ -111,7 +111,7 @@ fn main() {
             }
 
             //do world updates
-            update_camera(&mut camera_coords, player_coords);
+            update_camera(&mut camera_coords, player_coords);                                                   //move camera towards player
             window.request_redraw();                                                                            //request frame redraw
         }
     });
@@ -122,28 +122,28 @@ fn main() {
 ///contains chunk data
 struct Chunk {                      //world chunk object
     chunk_coords: (isize,isize),    //chunk coordinates
-    data: Vec<Vec<Particle>>,           //chunk Particle data
+    data: Vec<Vec<Particle>>,       //chunk Particle data
 }
 
 impl Chunk {
     ///generates a random colored chunk\
     ///that contains a 2d vector
-    fn gen_chunk(chunk_coords: (isize,isize)) -> Self{                          //generates new chunk with random color
+    fn gen_chunk(chunk_coords: (isize,isize)) -> Self{                              //generates new chunk with random color
         let mut data = vec![vec![Particle::new([0;4]); CHUNK_WIDTH]; CHUNK_HEIGHT]; //generate black chunk
-        let mut rng = rand::thread_rng();                                       //get rng handle
-        let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                           //generate random color values
-        for y in 0..data.len() {                                                //for y in data vec
-            for x in 0..data[y].len() {                                         //for x in y
+        let mut rng = rand::thread_rng();                                           //get rng handle
+        let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                               //generate random color values
+        for y in 0..data.len() {                                                    //for y in data vec
+            for x in 0..data[y].len() {                                             //for x in y
                 data[y][x] = Particle::new(rgba);                                   //update color
             }
         }
         //BLACK BOX
-        for y in 0..CHUNK_HEIGHT/25 {                                           //creates little black box to show upper left of chunk
+        for y in 0..CHUNK_HEIGHT/25 {                                               //creates little black box to show upper left of chunk
             for x in 0..CHUNK_WIDTH/25 {
                 data[y][x].rgba = [0;4];
             }
         } 
-        Self{                                                                   //return instance of chunk
+        Self{                                                                       //return instance of chunk
             chunk_coords,
             data
         }
@@ -230,33 +230,23 @@ fn render_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camer
 
 
 
-pub fn draw_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &str, font_size: f32, color: [u8;4]) {
-    // This only succeeds if collection consists of one font
-    let font = Font::try_from_bytes(DEBUG_FONT as &[u8]).expect("Error constructing Font");
-
-    // The font size to use
-    let scale = Scale::uniform(font_size);
-
-    let v_metrics = font.v_metrics(scale);
-
-    // layout the glyphs in a line with 20 pixels padding
-    let glyphs: Vec<_> = font
+///draws debug text to screen
+pub fn draw_debug_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &str, font_size: f32, color: [u8;4]) {
+    let font = Font::try_from_bytes(DEBUG_FONT as &[u8]).expect("Error constructing Font"); //get font from DEBUG_FONT
+    let scale = Scale::uniform(font_size);                                                  //calc font scale
+    let v_metrics = font.v_metrics(scale);                                                  //calc font size
+    let glyphs: Vec<_> = font                                                               // layout the glyphs in a line with 0 pixels padding
         .layout(text, scale, point(0.0, 0.0 + v_metrics.ascent))
         .collect();
-
-    // Loop through the glyphs in the text, positing each one on a line
-    for glyph in glyphs {
+    for glyph in glyphs {                                                                   // Loop through the glyphs in the text, positing each one on a line
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
-            // Draw the glyph into the image per-pixel by using the draw closure
-            glyph.draw(|x, y, v| {
-                // Offset the position by the glyph bounding box
-                let px = x as usize + bounding_box.min.x as usize + coords.0;
+            glyph.draw(|x, y, v| {                                                          // Draw the glyph into the image per-pixel by using the draw closure
+                let px = x as usize + bounding_box.min.x as usize + coords.0;               // Offset the position by the glyph bounding box
                 let py = y as usize + bounding_box.min.y as usize + coords.1;
-                // Turn the coverage into an alpha value
-                if v != 0.0 {
-                    match screen.get(py) {                                                                     //attempt y index
-                        Some(pyt) => match pyt.get(px) {
-                            Some(_) => screen[py][px] =color,                                 //if valid y index attempt x index
+                if v != 0.0 {                                                               // Turn the coverage into an alpha value
+                    match screen.get(py) {                                                  //attempt y index
+                        Some(pyt) => match pyt.get(px) {                                    //attempt x index
+                            Some(_) => screen[py][px] =color,                               //if valid x,y draw pixel
                             _ => (),
                         },
                         _ => (),
@@ -269,34 +259,38 @@ pub fn draw_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &s
 
 
 
+///renders debug text
 fn render_debug(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), camera_coords: (isize,isize), fps: usize) {
-    draw_text(screen, (20,20), "DEBUG SCREEN", 16.0, [255,255,255,0]);
+    draw_debug_text(screen, (20,20), "DEBUG", 16.0, [255,255,255,0]);
+    let s = format!("{} FPS", fps);
+    draw_debug_text(screen, (20,30), &s, 16.0, [255,255,255,0]);
     let s = format!("Player: {}, {}", player_coords.0, player_coords.1);
-    draw_text(screen, (20,30), &s, 16.0, [255,255,255,0]);
+    draw_debug_text(screen, (20,40), &s, 16.0, [255,255,255,0]);
     let s = format!("Chunk: {}, {} in {}, {}", player_coords.0 % CHUNK_WIDTH as isize, player_coords.1 % CHUNK_WIDTH as isize, player_coords.0 / CHUNK_WIDTH as isize, player_coords.1 / CHUNK_WIDTH as isize,);
-    draw_text(screen, (20,40), &s, 16.0, [255,255,255,0]);
+    draw_debug_text(screen, (20,50), &s, 16.0, [255,255,255,0]);
     let s = format!("Camera: {}, {}", camera_coords.0, camera_coords.1);
-    draw_text(screen, (20,50), &s, 16.0, [255,255,255,0]);
+    draw_debug_text(screen, (20,60), &s, 16.0, [255,255,255,0]);
 }
+
 
 
 
 ///gets 1D vec of current frame to draw from 4D Vec
 fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_coords: (isize, isize), debug_flag: bool, fps: usize) -> Vec<[u8;4]> {
-    let mut screen = get_visible(world,camera_coords);                  //gets visible pixels from world as 2d vec
-    render_block(&mut screen, camera_coords, camera_coords, 5, [255;4]);//render camera
-    render_block(&mut screen, player_coords, camera_coords, 5, [0;4]);  //render player
-    if ENABLE_DEBUG && debug_flag {render_debug(&mut screen, player_coords, camera_coords, fps)}
-    draw_text(&mut screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0]);
-    let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);        //creates black 1d vec
-    let mut i = 0;                                                      //pixel index counter                           
-    for pixel_y in screen {                                             //for y layer in visible pixels
-        for pixel_x in pixel_y {                                        //for x in y layer
-            screen_1d[i] = pixel_x;                                     //map to the id pixel index
-            i+=1;                                                       //inc index
+    let mut screen = get_visible(world,camera_coords);                                          //gets visible pixels from world as 2d vec
+    render_block(&mut screen, camera_coords, camera_coords, 5, [255;4]);                        //render camera
+    render_block(&mut screen, player_coords, camera_coords, 5, [0;4]);                          //render player
+    if ENABLE_DEBUG && debug_flag {render_debug(&mut screen, player_coords, camera_coords, fps)}//if debug flag and debug enabled: render debug
+    draw_debug_text(&mut screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0]);     //render game title
+    let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);                                //creates black 1d vec
+    let mut i = 0;                                                                              //pixel index counter                           
+    for pixel_y in screen {                                                                     //for y layer in visible pixels
+        for pixel_x in pixel_y {                                                                //for x in y layer
+            screen_1d[i] = pixel_x;                                                             //map to the id pixel index
+            i+=1;                                                                               //inc index
         }
     }
-    screen_1d                                                           //return 1d screen
+    screen_1d                                                                                   //return 1d screen
 }
 
 
@@ -313,8 +307,8 @@ fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Ve
                     let world_coords = get_world_coords(gen_chunk_x.chunk_coords, (local_x_coord, local_y_coord));  //get world coordinates from 0,0
                     let (pixel_x, pixel_y) = check_visible(world_coords, camera_coords);                            //check if pixel visible from camera
                     match screen.get(pixel_y) {                                                                     //attempt y index
-                        Some(py) => match py.get(pixel_x) {
-                            Some(_) => screen[pixel_y][pixel_x] =local_x.rgba,                                 //if valid y index attempt x index
+                        Some(py) => match py.get(pixel_x) {                                                         //if valid y index attempt x index
+                            Some(_) => screen[pixel_y][pixel_x] =local_x.rgba,                                      //if valid x,y map pixel
                             _ => (),
                         },
                         _ => (),
