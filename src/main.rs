@@ -1,6 +1,6 @@
 use std::{thread, time};
 use rand::Rng;
-
+use rusttype::{point, Font, Scale};
 
 use log::error;
 use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
@@ -18,6 +18,10 @@ const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
 const GEN_RANGE: isize = 4;
 const TARGET_FPS: u64 = 60;
+
+const GAME_TITLE: &str = "Untitled Game v0.001";
+const ENABLE_DEBUG: bool = true;
+const DEBUG_FONT: &[u8; 19836] = include_bytes!("fonts/debug.ttf");
 
 
 fn main() {
@@ -48,11 +52,12 @@ fn main() {
     let world = init_world();                                                                                   //generate world
     let mut player_coords: (isize, isize) = (128,-128);                                                         //set player location
     let mut camera_coords: (isize, isize) = (128,-128);                                                         //set camera location
+    let mut debug_flag = false;
 
     event_loop.run(move |event, _, control_flow| {                                                              //start game loop
         let frame_start = clock_ticks::precise_time_s();                                                        //get current loop start time
         if let Event::RedrawRequested(_) = event {                                                              //if redraw requested
-            draw(render_screen(&world, player_coords, camera_coords), pixels.get_frame());                                     //get screen then render screen
+            draw(render_screen(&world, player_coords, camera_coords, debug_flag, fps), pixels.get_frame());                                     //get screen then render screen
             if pixels                                                                                           //if rendering error
                 .render()                                                                                                       
                 .map_err(|e| error!("pixels.render() failed: {}", e))
@@ -93,6 +98,9 @@ fn main() {
             if input.key_held(VirtualKeyCode::Right) {
                 player_coords.0+=5;
             }
+            if input.key_pressed(VirtualKeyCode::F3) {
+                debug_flag = !debug_flag;
+            }
 
             if let Some(factor) = input.scale_factor_changed() {                                                //if window dimensions changed
                 hidpi_factor = factor;                                                                          //update hidpi_factor
@@ -110,25 +118,29 @@ fn main() {
 }
 
 
+
+///contains chunk data
 struct Chunk {                      //world chunk object
     chunk_coords: (isize,isize),    //chunk coordinates
-    data: Vec<Vec<Cell>>,           //chunk cell data
+    data: Vec<Vec<Particle>>,           //chunk Particle data
 }
 
 impl Chunk {
+    ///generates a random colored chunk\
+    ///that contains a 2d vector
     fn gen_chunk(chunk_coords: (isize,isize)) -> Self{                          //generates new chunk with random color
-        let mut data = vec![vec![Cell::new([0;4]); CHUNK_WIDTH]; CHUNK_HEIGHT]; //generate black chunk
+        let mut data = vec![vec![Particle::new([0;4]); CHUNK_WIDTH]; CHUNK_HEIGHT]; //generate black chunk
         let mut rng = rand::thread_rng();                                       //get rng handle
         let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                           //generate random color values
         for y in 0..data.len() {                                                //for y in data vec
             for x in 0..data[y].len() {                                         //for x in y
-                data[y][x] = Cell::new(rgba);                                   //update color
+                data[y][x] = Particle::new(rgba);                                   //update color
             }
         }
         //BLACK BOX
         for y in 0..CHUNK_HEIGHT/25 {                                           //creates little black box to show upper left of chunk
             for x in 0..CHUNK_WIDTH/25 {
-                data[y][x].data.rgba = [0;4];
+                data[y][x].rgba = [0;4];
             }
         } 
         Self{                                                                   //return instance of chunk
@@ -139,26 +151,15 @@ impl Chunk {
 }
 
 
+
+///cotains all particle data
 #[derive(Clone)]
-struct Cell {                   //chunk cell data
-    data: Particle,             //cell particle data
-}
-
-impl Cell {
-    fn new(rgba: [u8; 4]) -> Self {  //generates a new cell with specified particle color
-        Self {
-            data: Particle::new(rgba),
-        }
-    }
-}
-
-
-#[derive(Clone)]
-struct Particle {   //cell particle data
+struct Particle {   //Particle particle data
     rgba: [u8;4]    //rgba color code
 }
 
 impl Particle {
+    ///creates a colored particle
     fn new(rgba: [u8;4]) -> Self {  //generate new particle
         Self {
             rgba
@@ -167,7 +168,8 @@ impl Particle {
 }
 
 
-//generates starting area
+///generates starting area\
+///whats inside is temporary
 fn init_world() -> Vec<Vec<Chunk>> {                                                        //initalizes world
     let mut world: Vec<Vec<Chunk>> = Vec::new();                                            //create empty world
     let mut loaded_chunk_y = 0;                                                             //create y index counter
@@ -183,7 +185,7 @@ fn init_world() -> Vec<Vec<Chunk>> {                                            
 
 
 
-//updates camera position based off player coords
+///updates camera position based off player coords
 fn update_camera(camera_coords: &mut (isize,isize), player_coords: (isize, isize)) {
     let distance_x = player_coords.0 - camera_coords.0;         //calc x coord distance
     let distance_y = player_coords.1 - camera_coords.1;         //calc y coord distance
@@ -200,7 +202,7 @@ fn update_camera(camera_coords: &mut (isize,isize), player_coords: (isize, isize
 
 
 
-//draws current frame
+///draws current frame from 1D vec
 fn draw(screen: Vec<[u8;4]>, frame: &mut [u8]) {                
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {   //for spot in frame
         pixel.copy_from_slice(&screen[i]);                      //put pixel at spot
@@ -208,7 +210,7 @@ fn draw(screen: Vec<[u8;4]>, frame: &mut [u8]) {
 }
 
 
-//temp function that renders block at target
+///temp function that renders block at target
 fn render_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camera_coords: (isize, isize), size: isize, color: [u8;4]) {
     let screen_x = (SCREEN_WIDTH/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
     let screen_y = (SCREEN_HEIGHT/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
@@ -227,11 +229,65 @@ fn render_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camer
 }
 
 
-//gets current frame to draw
-fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_coords: (isize, isize)) -> Vec<[u8;4]> {
+
+pub fn draw_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &str, font_size: f32, color: [u8;4]) {
+    // This only succeeds if collection consists of one font
+    let font = Font::try_from_bytes(DEBUG_FONT as &[u8]).expect("Error constructing Font");
+
+    // The font size to use
+    let scale = Scale::uniform(font_size);
+
+    let v_metrics = font.v_metrics(scale);
+
+    // layout the glyphs in a line with 20 pixels padding
+    let glyphs: Vec<_> = font
+        .layout(text, scale, point(0.0, 0.0 + v_metrics.ascent))
+        .collect();
+
+    // Loop through the glyphs in the text, positing each one on a line
+    for glyph in glyphs {
+        if let Some(bounding_box) = glyph.pixel_bounding_box() {
+            // Draw the glyph into the image per-pixel by using the draw closure
+            glyph.draw(|x, y, v| {
+                // Offset the position by the glyph bounding box
+                let px = x as usize + bounding_box.min.x as usize + coords.0;
+                let py = y as usize + bounding_box.min.y as usize + coords.1;
+                // Turn the coverage into an alpha value
+                if v != 0.0 {
+                    match screen.get(py) {                                                                     //attempt y index
+                        Some(pyt) => match pyt.get(px) {
+                            Some(_) => screen[py][px] =color,                                 //if valid y index attempt x index
+                            _ => (),
+                        },
+                        _ => (),
+                    }
+                }
+            });
+        }
+    }
+}
+
+
+
+fn render_debug(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), camera_coords: (isize,isize), fps: usize) {
+    draw_text(screen, (20,20), "DEBUG SCREEN", 16.0, [255,255,255,0]);
+    let s = format!("Player: {}, {}", player_coords.0, player_coords.1);
+    draw_text(screen, (20,30), &s, 16.0, [255,255,255,0]);
+    let s = format!("Chunk: {}, {} in {}, {}", player_coords.0 % CHUNK_WIDTH as isize, player_coords.1 % CHUNK_WIDTH as isize, player_coords.0 / CHUNK_WIDTH as isize, player_coords.1 / CHUNK_WIDTH as isize,);
+    draw_text(screen, (20,40), &s, 16.0, [255,255,255,0]);
+    let s = format!("Camera: {}, {}", camera_coords.0, camera_coords.1);
+    draw_text(screen, (20,50), &s, 16.0, [255,255,255,0]);
+}
+
+
+
+///gets 1D vec of current frame to draw from 4D Vec
+fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_coords: (isize, isize), debug_flag: bool, fps: usize) -> Vec<[u8;4]> {
     let mut screen = get_visible(world,camera_coords);                  //gets visible pixels from world as 2d vec
     render_block(&mut screen, camera_coords, camera_coords, 5, [255;4]);//render camera
     render_block(&mut screen, player_coords, camera_coords, 5, [0;4]);  //render player
+    if ENABLE_DEBUG && debug_flag {render_debug(&mut screen, player_coords, camera_coords, fps)}
+    draw_text(&mut screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0]);
     let mut screen_1d = vec!([0;4]; SCREEN_WIDTH*SCREEN_HEIGHT);        //creates black 1d vec
     let mut i = 0;                                                      //pixel index counter                           
     for pixel_y in screen {                                             //for y layer in visible pixels
@@ -247,19 +303,18 @@ fn render_screen(world: &Vec<Vec<Chunk>>, player_coords: (isize, isize), camera_
 
 
 
-//july 3th 2pm el hogar monday
-//maps all visible pixels to screen 
+///maps all visible pixels to 2D vector from 4D vector
 fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Vec<[u8;4]>> {
     let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                                //creates black 2d vec for screen
     for gen_chunk_y in world{                                                                                       //for chunk layer
         for gen_chunk_x in gen_chunk_y{                                                                             //for chunk in layer
             for (local_y_coord, local_y) in gen_chunk_x.data.iter().enumerate(){                                    //for local layer in chunk
-                for (local_x_coord, local_x) in local_y.iter().enumerate(){                                         //for cell in local layer
+                for (local_x_coord, local_x) in local_y.iter().enumerate(){                                         //for Particle in local layer
                     let world_coords = get_world_coords(gen_chunk_x.chunk_coords, (local_x_coord, local_y_coord));  //get world coordinates from 0,0
                     let (pixel_x, pixel_y) = check_visible(world_coords, camera_coords);                            //check if pixel visible from camera
                     match screen.get(pixel_y) {                                                                     //attempt y index
                         Some(py) => match py.get(pixel_x) {
-                            Some(_) => screen[pixel_y][pixel_x] =local_x.data.rgba,                                 //if valid y index attempt x index
+                            Some(_) => screen[pixel_y][pixel_x] =local_x.rgba,                                 //if valid y index attempt x index
                             _ => (),
                         },
                         _ => (),
@@ -272,7 +327,7 @@ fn get_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Ve
 }
  
 
-//calculates world coordinates based off chunk and local coords
+///calculates world coordinates based off chunk and local coords
 fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (usize,usize)) -> (isize, isize) {
     let wx = world_chunk_coords.0*CHUNK_WIDTH as isize+world_local_coords.0 as isize;       //calculates x
     let wy = world_chunk_coords.1*CHUNK_HEIGHT as isize+world_local_coords.1 as isize*-1;   //calculates y                                                                  I HAVE NO IDEA WHY BUT *-1 FIXED Y AXIS CHUNK FLIP BUG
@@ -282,6 +337,8 @@ fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (usi
 
 
 
+///checks if target pixel is visible based off:\
+///    world coords, camera coords, and screen dimensions
 fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> (usize,usize){
     let distance_from_camera = {                                                                //gets (x,y) pixels +/- distance from camera
         let distance_x = world_coords.0 - camera_coords.0;                                      //calculates x
@@ -300,7 +357,7 @@ fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> 
 
 //Chunk
 //    coords: (i32,i32),
-//    data: Vec<Vec<Cell>>
+//    data: Vec<Vec<Particle>>
 //         coords: (u8,u8)
 //         data: Particle
 //             rgba: [u8;4]
@@ -310,5 +367,6 @@ fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> 
 
 #[test]
 fn test_it(){
+
 
 }
