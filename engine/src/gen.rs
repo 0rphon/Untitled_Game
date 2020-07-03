@@ -1,5 +1,3 @@
-use super::{CHUNK_WIDTH, CHUNK_HEIGHT, GEN_RANGE};
-
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rand::distributions::Alphanumeric;
 
@@ -12,8 +10,8 @@ pub struct Chunk {                      //world chunk object
 impl Chunk {
     ///generates a random colored chunk\
     ///that contains a 2d vector
-    fn gen_chunk(chunk_coords: (isize,isize), rng: &mut StdRng) -> Self{            //generates new chunk with random color
-        let mut data = vec![vec![Particle::new([0;4]); CHUNK_WIDTH]; CHUNK_HEIGHT]; //generate black chunk
+    fn gen_chunk(chunk_coords: (isize,isize), rng: &mut StdRng, chunk_width: usize, chunk_height: usize) -> Self{            //generates new chunk with random color
+        let mut data = vec![vec![Particle::new([0;4]); chunk_width]; chunk_height]; //generate black chunk
         let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                               //generate random color values
         for y in 0..data.len() {                                                    //for y in data vec
             for x in 0..data[y].len() {                                             //for x in y
@@ -21,8 +19,8 @@ impl Chunk {
             }
         }
         //BLACK BOX
-        for y in 0..CHUNK_HEIGHT/25 {                                               //creates little black box to show upper left of chunk
-            for x in 0..CHUNK_WIDTH/25 {
+        for y in 0..chunk_height/25 {                                               //creates little black box to show upper left of chunk
+            for x in 0..chunk_width/25 {
                 data[y][x].rgba = [0;4];
             }
         } 
@@ -54,13 +52,13 @@ impl Particle {
 
 ///generates starting area\
 ///whats inside is temporary
-pub fn init_world(rng: &mut StdRng) -> Vec<Vec<Chunk>> {                                         
+pub fn init_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> Vec<Vec<Chunk>> {                                         
     let mut world: Vec<Vec<Chunk>> = Vec::new();                                                //create empty world
     let mut loaded_chunk_y = 0;                                                                 //create y index counter
-    for world_chunk_y in (GEN_RANGE*-1..GEN_RANGE+1).rev() {                                    //for chunk layer coordinate in gen range 
+    for world_chunk_y in (gen_range*-1..gen_range+1).rev() {                                    //for chunk layer coordinate in gen range 
         world.push(Vec::new());                                                                 //push new layer to vec
-        for world_chunk_x in GEN_RANGE*-1..GEN_RANGE+1 {                                        //for chunk x_pos in gen range
-            world[loaded_chunk_y].push(Chunk::gen_chunk((world_chunk_x, world_chunk_y), rng));  //generate chunk and push to layer
+        for world_chunk_x in gen_range*-1..gen_range+1 {                                        //for chunk x_pos in gen range
+            world[loaded_chunk_y].push(Chunk::gen_chunk((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));  //generate chunk and push to layer
         }
         loaded_chunk_y+=1;                                                                      //inc y layer
     }

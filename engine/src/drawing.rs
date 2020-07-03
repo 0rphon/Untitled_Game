@@ -1,14 +1,14 @@
-use super::{SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT, DEBUG_FONT, gen::Chunk};
+use super::{gen::Chunk};
 
 use rusttype::{point, Font, Scale};
 
-
+pub const DEBUG_FONT: &[u8; 19836] = include_bytes!("fonts/debug.ttf");
 
 ///draws current frame from 2D vec
-pub fn draw(screen: Vec<Vec<[u8;4]>>, frame: &mut [u8]) {                
+pub fn flatten(screen: Vec<Vec<[u8;4]>>, frame: &mut [u8], screen_width: usize) {                
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {   //for spot in frame
-        let pixel_x = i % SCREEN_WIDTH;
-        let pixel_y = i / SCREEN_WIDTH;
+        let pixel_x = i % screen_width;
+        let pixel_y = i / screen_width;
         pixel.copy_from_slice(&screen[pixel_y][pixel_x]);       //put pixel at spot
     }
 }
@@ -16,14 +16,14 @@ pub fn draw(screen: Vec<Vec<[u8;4]>>, frame: &mut [u8]) {
 
 
 ///maps all visible pixels to 2D vector from 4D vector
-pub fn draw_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> Vec<Vec<[u8;4]>> {
-    let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                                //creates black 2d vec for screen
+pub fn draw_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) -> Vec<Vec<[u8;4]>> {
+    let mut screen = vec!(vec!([0;4]; screen_width); screen_height);                                                //creates black 2d vec for screen
     for gen_chunk_y in world{                                                                                       //for chunk layer
         for gen_chunk_x in gen_chunk_y{                                                                             //for chunk in layer
             for (local_y_coord, local_y) in gen_chunk_x.data.iter().enumerate(){                                    //for local layer in chunk
                 for (local_x_coord, local_x) in local_y.iter().enumerate(){                                         //for Particle in local layer
-                    let world_coords = get_world_coords(gen_chunk_x.chunk_coords, (local_x_coord, local_y_coord));  //get world coordinates from 0,0
-                    let (pixel_x, pixel_y) = check_visible(world_coords, camera_coords);                            //check if pixel visible from camera
+                    let world_coords = get_world_coords(gen_chunk_x.chunk_coords, (local_x_coord, local_y_coord), chunk_width, chunk_height);  //get world coordinates from 0,0
+                    let (pixel_x, pixel_y) = check_visible(world_coords, camera_coords, screen_width, screen_height);                            //check if pixel visible from camera
                     match screen.get(pixel_y) {                                                                     //attempt y index
                         Some(py) => match py.get(pixel_x) {                                                         //if valid y index attempt x index
                             Some(_) => screen[pixel_y][pixel_x] =local_x.rgba,                                      //if valid x,y map pixel
@@ -41,9 +41,9 @@ pub fn draw_visible(world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize)) -> V
 
 
 ///temp function that draws block at target
-pub fn draw_debug_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camera_coords: (isize, isize), size: isize, color: [u8;4]) {
-    let screen_x = (SCREEN_WIDTH/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
-    let screen_y = (SCREEN_HEIGHT/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
+pub fn draw_debug_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize), camera_coords: (isize, isize), size: isize, color: [u8;4], screen_width: usize, screen_height: usize) {
+    let screen_x = (screen_width/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
+    let screen_y = (screen_height/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
     for y in screen_y-size..screen_y+size {                                             //for pixel in y range
         for x in screen_x-size..screen_x+size {                                         //for pixel in x range
             match screen.get(y as usize) {                                              //attempt y index
@@ -60,13 +60,14 @@ pub fn draw_debug_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize
 
 
 ///draws debug text
-pub fn draw_debug_screen(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), camera_coords: (isize,isize), fps: usize, seed: &String) {
+pub fn draw_debug_screen(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), camera_coords: (isize,isize), fps: usize, seed: &String, chunk_width: usize) {
     draw_text(screen, (20,20), "DEBUG", 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("{} FPS", fps);
     draw_text(screen, (20,30), &s, 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("Player: {}, {}", player_coords.0, player_coords.1);
     draw_text(screen, (20,40), &s, 16.0, [255,255,255,0], DEBUG_FONT);
-    let s = format!("Chunk: {}, {} in {}, {}", player_coords.0 % CHUNK_WIDTH as isize, player_coords.1 % CHUNK_WIDTH as isize, player_coords.0 / CHUNK_WIDTH as isize, player_coords.1 / CHUNK_WIDTH as isize,);
+    let s = format!("Chunk: {}, {} in {}, {}", player_coords.0 % chunk_width as isize, player_coords.1 % chunk_width as isize, 
+                                            player_coords.0 / chunk_width as isize, player_coords.1 / chunk_width as isize,);
     draw_text(screen, (20,50), &s, 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("Camera: {}, {}", camera_coords.0, camera_coords.1);
     draw_text(screen, (20,60), &s, 16.0, [255,255,255,0], DEBUG_FONT);
@@ -107,7 +108,7 @@ pub fn draw_text(screen: &mut Vec<Vec<[u8;4]>>, coords: (usize, usize), text: &s
 
 ///checks if target pixel is visible based off:\
 ///    world coords, camera coords, and screen dimensions
-fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> (usize,usize){
+fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize), screen_width: usize, screen_height: usize) -> (usize,usize){
     let distance_from_camera = {                                                                //gets (x,y) pixels +/- distance from camera
         let distance_x = world_coords.0 - camera_coords.0;                                      //calculates x
         let distance_y = world_coords.1 - camera_coords.1;                                      //calculates y
@@ -117,17 +118,17 @@ fn check_visible(world_coords: (isize, isize), camera_coords: (isize,isize)) -> 
         if distance > 0 {(distance+length/2) as usize}                                          //if + coord from cam add 1/2 screen len                                
         else {(length/2 - distance*-1) as usize}                                                //if - coord from cam make positive and subtract from half screen len
     };
-    let pixel_x = calc_position(distance_from_camera.0, SCREEN_WIDTH as isize);                 //calc x coord on screen
-    let tmp_y = calc_position(distance_from_camera.1, SCREEN_HEIGHT as isize);
-    let pixel_y = if tmp_y < SCREEN_HEIGHT {SCREEN_HEIGHT - tmp_y} else {tmp_y};                //calc y coord on screen                                                NEEDS SCREEN_HEIGHT- BUT NOT 100% SURE WHY TBH              
+    let pixel_x = calc_position(distance_from_camera.0, screen_width as isize);                 //calc x coord on screen
+    let tmp_y = calc_position(distance_from_camera.1, screen_height as isize);
+    let pixel_y = if tmp_y < screen_height {screen_height - tmp_y} else {tmp_y};                //calc y coord on screen                                                NEEDS screen_height- BUT NOT 100% SURE WHY TBH              
     (pixel_x,pixel_y)                                                                           //return position on screen
 }
 
 
 
 ///calculates world coordinates based off chunk and local coords
-fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (usize,usize)) -> (isize, isize) {
-    let wx = world_chunk_coords.0*CHUNK_WIDTH as isize+world_local_coords.0 as isize;       //calculates x
-    let wy = world_chunk_coords.1*CHUNK_HEIGHT as isize+world_local_coords.1 as isize*-1;   //calculates y                                                                  I HAVE NO IDEA WHY BUT *-1 FIXED Y AXIS CHUNK FLIP BUG
+fn get_world_coords(world_chunk_coords: (isize, isize), world_local_coords: (usize,usize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
+    let wx = world_chunk_coords.0*chunk_width as isize+world_local_coords.0 as isize;       //calculates x
+    let wy = world_chunk_coords.1*chunk_height as isize+world_local_coords.1 as isize*-1;   //calculates y                                                                  I HAVE NO IDEA WHY BUT *-1 FIXED Y AXIS CHUNK FLIP BUG
     (wx,wy)
 }
