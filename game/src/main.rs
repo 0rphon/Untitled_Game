@@ -90,26 +90,18 @@ fn main() {
                 return;
             }
 
-            if input.key_held(VirtualKeyCode::Up) {
-                player.walk(player::Direction::Up)
-            }
-            if input.key_held(VirtualKeyCode::Down) {
-                player.walk(player::Direction::Down)
-            }
-            if input.key_held(VirtualKeyCode::Left) {
-                player.walk(player::Direction::Left)
-            }
-            if input.key_held(VirtualKeyCode::Right) {
-                player.walk(player::Direction::Right)
-            }
-            if input.key_pressed(VirtualKeyCode::F3) {                                                                      //if f3 pressed
-                debug_flag = !debug_flag;                                                                                   //toggle debug
-            }
-
+            if input.key_held(VirtualKeyCode::W) {player.walk(player::Direction::Up)}
+            if input.key_held(VirtualKeyCode::A) {player.walk(player::Direction::Left)}
+            if input.key_held(VirtualKeyCode::S) {player.walk(player::Direction::Down)}
+            if input.key_held(VirtualKeyCode::D) {player.walk(player::Direction::Right)}
+            if input.key_pressed(VirtualKeyCode::Space){player.jump()}
+            if input.key_pressed(VirtualKeyCode::LShift) {player.running = true} 
+            else if input.key_released(VirtualKeyCode::LShift){ player.running = false}
+            if input.key_pressed(VirtualKeyCode::F3) {debug_flag = !debug_flag}
+            
             if let Some(factor) = input.scale_factor_changed() {                                                            //if window dimensions changed
                 hidpi_factor = factor;                                                                                      //update hidpi_factor
             }
-
             if let Some(size) = input.window_resized() {                                                                    //if window resized
                 pixels.resize(size.width, size.height);                                                                     //resize pixel aspect ratio
             }

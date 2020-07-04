@@ -12,6 +12,7 @@ pub struct Player {
     pub max_velocity: f32,
     pub acceleration_speed: f32,
     pub deceleration_unit: f32,
+    pub running: bool,
 }
 
 impl Player {
@@ -22,7 +23,8 @@ impl Player {
             velocity: (0.0,0.0),
             max_velocity: 50.0,
             acceleration_speed: 5.0,
-            deceleration_unit: 20.0 //bad name. velocity -= velocity/decel_unit
+            deceleration_unit: 20.0, //bad name. velocity -= velocity/decel_unit
+            running: false,
         }
     }
 
@@ -36,25 +38,29 @@ impl Player {
     pub fn walk(&mut self, direction: Direction) {
         match direction {
             Direction::Right => {
-                if self.velocity.0 < self.max_velocity {
+                if self.velocity.0 < self.max_velocity || self.running {
                     self.velocity.0 += self.acceleration_speed
                 }
             },
             Direction::Left => {
-                if self.velocity.0*-1.0 < self.max_velocity {
+                if self.velocity.0*-1.0 < self.max_velocity || self.running {
                     self.velocity.0 -= self.acceleration_speed
                 }
             },
             Direction::Up => {
-                if self.velocity.1 < self.max_velocity {
+                if self.velocity.1 < self.max_velocity || self.running {
                     self.velocity.1 += self.acceleration_speed
                 }
             },
             Direction::Down => {
-                if self.velocity.1*-1.0 < self.max_velocity {
+                if self.velocity.1*-1.0 < self.max_velocity || self.running {
                     self.velocity.1 -= self.acceleration_speed
                 }
             },
         }
+    }
+
+    pub fn jump(&mut self) {
+        self.velocity.1+=100.0;
     }
 }
