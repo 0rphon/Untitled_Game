@@ -1,4 +1,4 @@
-use super::{gen::Chunk};
+use super::{gen::Chunk, player::Player};
 
 use rusttype::{point, Font, Scale};
 
@@ -60,19 +60,21 @@ pub fn draw_debug_block(screen: &mut Vec<Vec<[u8;4]>>, obj_coords: (isize, isize
 
 
 ///draws debug text
-pub fn draw_debug_screen(screen: &mut Vec<Vec<[u8;4]>>, player_coords: (isize,isize), camera_coords: (isize,isize), fps: usize, seed: &String, chunk_width: usize) {
+pub fn draw_debug_screen(screen: &mut Vec<Vec<[u8;4]>>, player: &mut Player, camera_coords: (isize,isize), fps: usize, seed: &String, chunk_width: usize) {
     draw_text(screen, (20,20), "DEBUG", 16.0, [255,255,255,0], DEBUG_FONT);
     let s = format!("{} FPS", fps);
     draw_text(screen, (20,30), &s, 16.0, [255,255,255,0], DEBUG_FONT);
-    let s = format!("Player: {}, {}", player_coords.0, player_coords.1);
+    let s = format!("Player: {}, {}", player.coords.0, player.coords.1);
     draw_text(screen, (20,40), &s, 16.0, [255,255,255,0], DEBUG_FONT);
-    let s = format!("Chunk: {}, {} in {}, {}", player_coords.0 % chunk_width as isize, player_coords.1 % chunk_width as isize, 
-                                            player_coords.0 / chunk_width as isize, player_coords.1 / chunk_width as isize,);
+    let s = format!("Velcoity: {:2.3}, {:2.3}", player.velocity.0, player.velocity.1);
     draw_text(screen, (20,50), &s, 16.0, [255,255,255,0], DEBUG_FONT);
-    let s = format!("Camera: {}, {}", camera_coords.0, camera_coords.1);
+    let s = format!("Chunk: {}, {} in {}, {}", player.coords.0 % chunk_width as isize, player.coords.1 % chunk_width as isize, 
+                                            player.coords.0 / chunk_width as isize, player.coords.1 / chunk_width as isize,);
     draw_text(screen, (20,60), &s, 16.0, [255,255,255,0], DEBUG_FONT);
-    let s = format!("Seed: {}", seed);
+    let s = format!("Camera: {}, {}", camera_coords.0, camera_coords.1);
     draw_text(screen, (20,70), &s, 16.0, [255,255,255,0], DEBUG_FONT);
+    let s = format!("Seed: {}", seed);
+    draw_text(screen, (20,80), &s, 16.0, [255,255,255,0], DEBUG_FONT);
 }
 
 

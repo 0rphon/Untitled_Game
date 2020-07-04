@@ -1,4 +1,4 @@
-use engine::{drawing, gen};
+use engine::{drawing, gen, player};
 
 use std::{thread, time};
 
@@ -22,7 +22,7 @@ const ENABLE_DEBUG: bool = true;                                    //if debug c
 const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
 const GEN_RANGE: isize = 4;             //how far out to gen chunks
-const SET_SEED: bool = true;            //if seed should be set
+const SET_SEED: bool = false;            //if seed should be set
 const SEED: &str = "TESTSEED";          //seed to set
 
 
@@ -54,14 +54,14 @@ fn main() {
 
     let (mut rng, seed) = gen::get_rng(SET_SEED, SEED);                                                                     //get rng and display_seed
     let world = gen::init_world(&mut rng, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                                            //generate world
-    let mut player_coords: (isize, isize) = (0,0);                                                                          //set player location
+    let mut player = player::Player::spawn((0,0));                                                                          //spawn player at 0,0
     let mut camera_coords: (isize, isize) = (0,0);                                                                          //set camera location
     let mut debug_flag = false;
 
     event_loop.run(move |event, _, control_flow| {                                                                          //start game loop
         let frame_start = clock_ticks::precise_time_s();                                                                    //get current loop start time                           VSYNC NOT ACCURATE
         if let Event::RedrawRequested(_) = event {                                                                          //if redraw requested
-            drawing::flatten(draw_screen(&world, player_coords, camera_coords, debug_flag, fps, &seed), pixels.get_frame(), SCREEN_WIDTH);//get screen then render screen
+            drawing::flatten(draw_screen(&world, &mut player, camera_coords, debug_flag, fps, &seed), pixels.get_frame(), SCREEN_WIDTH);//get screen then render screen
             if pixels                                                                                                       //if rendering error
                 .render()                                                                                                       
                 .map_err(|e| error!("pixels.render() failed: {}", e))
@@ -91,16 +91,16 @@ fn main() {
             }
 
             if input.key_held(VirtualKeyCode::Up) {
-                player_coords.1+=5;
+                player.walk(player::Direction::Up)
             }
             if input.key_held(VirtualKeyCode::Down) {
-                player_coords.1-=5;
+                player.walk(player::Direction::Down)
             }
             if input.key_held(VirtualKeyCode::Left) {
-                player_coords.0-=5;
+                player.walk(player::Direction::Left)
             }
             if input.key_held(VirtualKeyCode::Right) {
-                player_coords.0+=5;
+                player.walk(player::Direction::Right)
             }
             if input.key_pressed(VirtualKeyCode::F3) {                                                                      //if f3 pressed
                 debug_flag = !debug_flag;                                                                                   //toggle debug
@@ -115,7 +115,7 @@ fn main() {
             }
 
             //do world updates
-            update_camera(&mut camera_coords, player_coords);                                                               //move camera towards player
+            do_updates(&mut camera_coords, &mut player);
             window.request_redraw();                                                                                        //request frame redraw
         }
     });
@@ -124,9 +124,9 @@ fn main() {
 
 
 ///updates camera position based off player coords
-fn update_camera(camera_coords: &mut (isize,isize), player_coords: (isize, isize)) {
-    let distance_x = player_coords.0 - camera_coords.0;         //calc x coord distance
-    let distance_y = player_coords.1 - camera_coords.1;         //calc y coord distance
+fn update_camera(camera_coords: &mut (isize,isize), player: &mut player::Player) {
+    let distance_x = player.coords.0 - camera_coords.0;         //calc x coord distance
+    let distance_y = player.coords.1 - camera_coords.1;         //calc y coord distance
     let move_cam = |distance, camera: &mut isize| {             //closure that handles moving camera
         if distance < 25 && distance > -25 && distance != 0 {   //if camera distance less than 25px from player and not on player
             if distance >= 0 {*camera+=1}                       //move 1px positive if positive
@@ -141,15 +141,21 @@ fn update_camera(camera_coords: &mut (isize,isize), player_coords: (isize, isize
 
 
 ///gets 2D vec of current frame to draw from 4D Vec
-fn draw_screen(world: &Vec<Vec<gen::Chunk>>, player_coords: (isize, isize), camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: &String) -> Vec<Vec<[u8;4]>> {
+fn draw_screen(world: &Vec<Vec<gen::Chunk>>, player: &mut player::Player, camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: &String) -> Vec<Vec<[u8;4]>> {
     let mut screen = drawing::draw_visible(world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);                                                    //gets visible pixels from world as 2d vec
     drawing::draw_debug_block(&mut screen, camera_coords, camera_coords, 5, [255;4], SCREEN_WIDTH, SCREEN_HEIGHT);                               //render camera
-    drawing::draw_debug_block(&mut screen, player_coords, camera_coords, 5, [0;4], SCREEN_WIDTH, SCREEN_HEIGHT);                                 //render player
-    if ENABLE_DEBUG && debug_flag {drawing::draw_debug_screen(&mut screen, player_coords, camera_coords, fps, seed, CHUNK_WIDTH)}//if debug flag and debug enabled: render debug
+    drawing::draw_debug_block(&mut screen, player.coords, camera_coords, 5, [0;4], SCREEN_WIDTH, SCREEN_HEIGHT);                                 //render player
+    if ENABLE_DEBUG && debug_flag {drawing::draw_debug_screen(&mut screen, player, camera_coords, fps, seed, CHUNK_WIDTH)}//if debug flag and debug enabled: render debug
     drawing::draw_text(&mut screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);          //render game title                         
     screen                                                                                                          //return 1d screen
 }
 
+
+
+fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player) {
+    player.update_location();
+    update_camera(camera_coords, player);                                                               //move camera towards player
+}
 
 
 //Chunk
