@@ -13,10 +13,11 @@ pub struct Player {
     pub acceleration_speed: f32,
     pub deceleration_unit: f32,
     pub running: bool,
+    pub sprite: Vec<Vec<[u8;4]>>,
 }
 
 impl Player {
-    pub fn spawn(coords: (isize, isize)) -> Player {
+    pub fn spawn(coords: (isize, isize), sprite: Vec<Vec<[u8;4]>>) -> Player {
         Player{
             health: 100,
             coords,
@@ -25,6 +26,7 @@ impl Player {
             acceleration_speed: 5.0,
             deceleration_unit: 20.0, //bad name. velocity -= velocity/decel_unit
             running: false,
+            sprite,
         }
     }
 

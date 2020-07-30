@@ -23,7 +23,7 @@ impl Chunk {
             for x in 0..chunk_width/25 {
                 data[y][x].rgba = [0;4];
             }
-        } 
+        }
         Self{                                                                       //return instance of chunk
             chunk_coords,
             data
@@ -52,10 +52,10 @@ impl Particle {
 
 ///generates starting area\
 ///whats inside is temporary
-pub fn init_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> Vec<Vec<Chunk>> {                                         
+pub fn init_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> Vec<Vec<Chunk>> {
     let mut world: Vec<Vec<Chunk>> = Vec::new();                                                //create empty world
     let mut loaded_chunk_y = 0;                                                                 //create y index counter
-    for world_chunk_y in (gen_range*-1..gen_range+1).rev() {                                    //for chunk layer coordinate in gen range 
+    for world_chunk_y in (gen_range*-1..gen_range+1).rev() {                                    //for chunk layer coordinate in gen range
         world.push(Vec::new());                                                                 //push new layer to vec
         for world_chunk_x in gen_range*-1..gen_range+1 {                                        //for chunk x_pos in gen range
             world[loaded_chunk_y].push(Chunk::gen_chunk((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));  //generate chunk and push to layer
@@ -78,7 +78,7 @@ pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &Vec<Vec<Chunk>>, camera
                 } else {screen[py][px] = [0;4]}                                                                 //if target chunk doesn't exist color black
             } else {screen[py][px] = [0;4]}                                                                     //if target chunk row doesn't exist color black
         }
-    } 
+    }
 }
 
 ///calculates chunk (x,y) and internal (x,y) from local coordinates
@@ -87,7 +87,7 @@ fn get_local_coord_pair(coords: (usize, usize), chunk_width: usize, chunk_height
 }
 
 ///calculates local coordinates in world vec from your global position
-///returns negative if above/left of rendered area 
+///returns negative if above/left of rendered area
 fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
     let (wx, wy) = world[0][0].chunk_coords;            //gets coords of first chunk in rendered vec
     let lx = coords.0 - (wx * chunk_width as isize);    //calculates local x coord based off world coords of first chunk
@@ -95,12 +95,17 @@ fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width
     (lx, ly)
 }
 
+pub fn get_screen_coords(obj_coords: (isize, isize), camera_coords: (isize, isize), screen_width: usize, screen_height: usize) -> (isize, isize) {
+    let screen_x = (screen_width/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
+    let screen_y = (screen_height/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
+    (screen_x,screen_y)                                                                 //return position on screen
+}
 
 ///handle seeding of world
 pub fn get_rng(set_seed: bool, seed: &str) -> (StdRng, String) {
     let mut full_seed = seed.to_string();                                               //set full_seed as supplied seed
     let mut display_seed = seed.to_string();                                            //set seed to display as supplied seed
-    if !set_seed {                                                                      //if set seed flag not set 
+    if !set_seed {                                                                      //if set seed flag not set
         full_seed = rand::thread_rng().sample_iter(&Alphanumeric).take(32).collect();   //generate new 32 char seed
         display_seed = full_seed.clone();                                               //set display seed to new seed
     }

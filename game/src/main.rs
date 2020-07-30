@@ -3,7 +3,6 @@ use engine::{drawing, gen, player};
 use std::time;
 use spin_sleep;
 
-use log::error;
 use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
@@ -32,7 +31,7 @@ fn main() {
     let (mut rng, seed) = gen::get_rng(SET_SEED, SEED);                                                                     //get rng and display_seed
     let world = gen::init_world(&mut rng, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                                            //generate world
     let mut screen: drawing::Screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                       //create blank screen buffer
-    let mut player = player::Player::spawn((0,0));                                                                          //spawn player at 0,0
+    let mut player = player::Player::spawn((0,0), drawing::load_sprite("sprites/dude.png").unwrap());                       //spawn player at 0,0
     let mut camera_coords: (isize, isize) = (0,0);                                                                          //set camera location
     let mut debug_flag = false;
 
@@ -67,7 +66,7 @@ fn main() {
             drawing::flatten(&screen, pixels.get_frame(), SCREEN_WIDTH);                                                    //render screen
             if pixels                                                                                                       //if rendering error
                 .render()                                                                                                       
-                .map_err(|e| error!("pixels.render() failed: {}", e))
+                .map_err(|e| panic!("pixels.render() failed: {}", e))
                 .is_err() {
                 *control_flow = ControlFlow::Exit;                                                                          //break
                 return;
@@ -136,11 +135,27 @@ fn update_camera(camera_coords: &mut (isize,isize), player: &mut player::Player)
 
 ///gets 2D vec of current frame to draw from 4D Vec
 fn draw_screen(screen: &mut drawing::Screen, world: &Vec<Vec<gen::Chunk>>, player: &mut player::Player, camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: &String) {
-    gen::get_screen(screen, world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);       //gets visible pixels from world as 2d vec
-    drawing::draw_debug_block(screen, camera_coords, camera_coords, 5, [255;4], SCREEN_WIDTH, SCREEN_HEIGHT);   //render camera
-    drawing::draw_debug_block(screen, player.coords, camera_coords, 5, [0;4], SCREEN_WIDTH, SCREEN_HEIGHT);     //render player
-    if ENABLE_DEBUG && debug_flag {draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_WIDTH)}    //if debug flag and debug enabled: render debug
-    drawing::draw_text(screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);  //render game title                         
+    gen::get_screen(screen, world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);                                   //gets visible pixels from world as 2d vec
+    drawing::draw_sprite(screen, &player.sprite, gen::get_screen_coords(player.coords, camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT));        //draw player sprite
+    if ENABLE_DEBUG && debug_flag {                                                                                                         //if debug flag and debug enabled:
+        drawing::draw_debug_block(screen,                                                                                                   //render debug block on camera
+                                    gen::get_screen_coords(camera_coords, 
+                                                            camera_coords, 
+                                                            SCREEN_WIDTH, 
+                                                            SCREEN_HEIGHT), 
+                                                            5, 
+                                                            [255;4]);   
+        drawing::draw_debug_outline(screen,                                                                                                 //render debug outline on player
+                                    gen::get_screen_coords(player.coords, 
+                                                            camera_coords, 
+                                                            SCREEN_WIDTH, 
+                                                            SCREEN_HEIGHT), 
+                                    (player.sprite[0].len(), 
+                                    player.sprite.len()), 
+                                    [255,0,0,0]);     
+        draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_WIDTH)                                                            //render debug screen
+    }                        
+    drawing::draw_text(screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);                              //render game title                         
 }
 
 

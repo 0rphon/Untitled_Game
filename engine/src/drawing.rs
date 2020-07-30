@@ -20,12 +20,11 @@ pub fn flatten(screen: &Screen, frame: &mut [u8], screen_width: usize) {
 
 
 
-///temp function that draws block at target
-pub fn draw_debug_block(screen: &mut Screen, obj_coords: (isize, isize), camera_coords: (isize, isize), size: isize, color: [u8;4], screen_width: usize, screen_height: usize) {
-    let screen_x = (screen_width/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
-    let screen_y = (screen_height/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
-    for y in screen_y-size..screen_y+size {                                             //for pixel in y range
-        for x in screen_x-size..screen_x+size {                                         //for pixel in x range
+///function that draws block at target
+pub fn draw_debug_block(screen: &mut Screen, coords: (isize, isize), mut size: isize, color: [u8;4]) {
+    size = size/2;
+    for y in coords.1-size..coords.1+size {                                             //for pixel in y range
+        for x in coords.0-size..coords.0+size {                                         //for pixel in x range
             match screen.get(y as usize) {                                              //attempt y index
                 Some(py) => match py.get(x as usize) {                                  //if valid y index attempt x index
                     Some(_) => screen[y as usize][x as usize] = color,                  //if valid x index draw pixel
@@ -37,6 +36,31 @@ pub fn draw_debug_block(screen: &mut Screen, obj_coords: (isize, isize), camera_
     }  
 }
 
+pub fn draw_debug_outline(screen: &mut Screen, coords: (isize, isize), mut size: (usize, usize), color: [u8;4]) {
+    size = (size.0/2, size.1/2);
+    for yi in coords.1-size.1 as isize..coords.1+size.1 as isize {
+        if let Some(y) = screen.get_mut(yi as usize) {
+            if let Some(x) = y.get_mut(coords.0 as usize-size.0) {
+                *x = color;
+            }
+            if let Some(x) = y.get_mut(coords.0 as usize+size.0) {
+                *x = color;
+            }
+        }
+    }
+    for xi in coords.0-size.0 as isize..coords.0+size.0 as isize {
+        if let Some(y) = screen.get_mut(coords.1 as usize-size.0) {
+            if let Some(x) = y.get_mut(xi as usize) {
+                *x = color;
+            }
+        }
+        if let Some(y) = screen.get_mut(coords.1 as usize+size.0) {
+            if let Some(x) = y.get_mut(xi as usize) {
+                *x = color;
+            }
+        }
+    }
+}
 
 
 ///draws raw text to screen
@@ -147,13 +171,15 @@ pub fn scale_sprite(sprite: &Vec<Vec<[u8;4]>>, scale: usize) -> Vec<Vec<[u8;4]>>
 
 
 ///draws sprite to screen, ignoring transparent pixels
-pub fn draw_sprite(screen: &mut Vec<Vec<[u8;4]>>, sprite: &Vec<Vec<[u8;4]>>, coords: (usize, usize)) {
-    for (yi, row) in sprite.iter().enumerate() {                            //for row index, row
-        for (xi, pixel) in row.iter().enumerate() {                         //for column index, pixel
-            if pixel[3] != 0 {                                              //if pixel not transparent
-                if let Some(scr_row) = screen.get_mut(coords.1+yi) {        //check if row exists on screen
-                    if let Some(scr_pixel) = scr_row.get_mut(coords.0+xi) { //check if column exists on screen
-                        *scr_pixel = pixel.clone();                         //if yes push pixel to location
+pub fn draw_sprite(screen: &mut Vec<Vec<[u8;4]>>, sprite: &Vec<Vec<[u8;4]>>, coords: (isize, isize)) {
+    for (yi, row) in sprite.iter().enumerate() {                                //for row index, row
+        for (xi, pixel) in row.iter().enumerate() {                             //for column index, pixel
+            if pixel[3] != 0 {                                                  //if pixel not transparent
+                let x = (coords.0 + xi as isize ) as usize - (sprite.len()/2);  //gets x,y index on screen for current pixel
+                let y = (coords.1 + yi as isize) as usize - (row.len()/2);      //kinda hacky. if negative (aka off screen left or up) then wraps to max positive which should *also* not be visible
+                if let Some(scr_row) = screen.get_mut(y) {                      //check if row exists on screen
+                    if let Some(scr_pixel) = scr_row.get_mut(x) {               //check if column exists on screen
+                        *scr_pixel = pixel.clone();                             //if yes push pixel to location
                     }
                 }
             }
