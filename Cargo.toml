@@ -1,8 +1,12 @@
-[workspace]
-members = [
-    "engine",
-    "game",
-]
+[package]
+name = "untitled_game"
+version = "0.1.0"
+authors = ["0rphon <59403052+0rphon@users.noreply.github.com>"]
+edition = "2018"
 
-[profile.dev]
-opt-level = 3
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+engine = {git = "https://github.com/0rphon/Untitled_Engine"}
+spin_sleep = "1.0.0"
+rand = "0.7.3"

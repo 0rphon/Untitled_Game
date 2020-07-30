@@ -1,14 +1,9 @@
-use engine::{drawing, gen, player};
+mod player;
+mod gen;
+use engine::{drawing, window};
 
 use std::time;
 use spin_sleep;
-
-use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
-use winit::dpi::LogicalSize;
-use winit::event::{Event, VirtualKeyCode};
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
-use winit_input_helper::WinitInputHelper;
 
 const SCREEN_HEIGHT: usize = 528;
 const SCREEN_WIDTH: usize = 960;
@@ -40,35 +35,18 @@ fn main() {
     let target_ft = time::Duration::from_micros(1000000 / TARGET_FPS);                                                      //set target fps
     let mut second_count = time::Instant::now();                                                                            //start second timer
 
-    let event_loop = EventLoop::new();                                                                                      //create event loop obj
-    let mut input = WinitInputHelper::new();                                                                                //create WinitIH obj
-    let window = {                                                                                                          //create window obj
-        let size = LogicalSize::new(SCREEN_WIDTH as f64, SCREEN_HEIGHT as f64);
-        WindowBuilder::new()
-            .with_title(GAME_TITLE)
-            .with_inner_size(size)
-            .with_min_inner_size(size)
-            .build(&event_loop)
-            .unwrap()
-    };
-    let mut hidpi_factor = window.scale_factor();                                                                           //get window dimensions
-
-    let mut pixels = {                                                                                                      //create pixel buffer
-        let surface = Surface::create(&window);
-        let surface_texture = SurfaceTexture::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32, surface);
-        Pixels::new(SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32, surface_texture).unwrap()
-    };
+    let (event_loop, mut input, window, mut hidpi_factor, mut pixels) = window::init(GAME_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
 
     event_loop.run(move |event, _, control_flow| {                                                                          //start game loop
         let frame_time = time::Instant::now();                                                                              //set start of frame time
-        if let Event::RedrawRequested(_) = event {                                                                          //if redraw requested
+        if let window::Event::RedrawRequested(_) = event {                                                                          //if redraw requested
             draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fps, &seed);                           //draws new frame to screen buffer
             drawing::flatten(&screen, pixels.get_frame(), SCREEN_WIDTH);                                                    //render screen
             if pixels                                                                                                       //if rendering error
                 .render()                                                                                                       
                 .map_err(|e| panic!("pixels.render() failed: {}", e))
                 .is_err() {
-                *control_flow = ControlFlow::Exit;                                                                          //break
+                *control_flow = window::ControlFlow::Exit;                                                                          //break
                 return;
             }                
 
@@ -86,19 +64,19 @@ fn main() {
         
         if input.update(event) {                                                                                            //handle input events on loop? not just on event
             
-            if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {                                                  //if esc pressed
-                *control_flow = ControlFlow::Exit;                                                                          //exit
+            if input.key_pressed(window::VirtualKeyCode::Escape) || input.quit() {                                                  //if esc pressed
+                *control_flow = window::ControlFlow::Exit;                                                                          //exit
                 return;
             }
 
-            if input.key_held(VirtualKeyCode::W) {player.walk(player::Direction::Up)}
-            if input.key_held(VirtualKeyCode::A) {player.walk(player::Direction::Left)}
-            if input.key_held(VirtualKeyCode::S) {player.walk(player::Direction::Down)}
-            if input.key_held(VirtualKeyCode::D) {player.walk(player::Direction::Right)}
-            if input.key_pressed(VirtualKeyCode::Space){player.jump()}
-            if input.key_pressed(VirtualKeyCode::LShift) {player.running = true} 
-            else if input.key_released(VirtualKeyCode::LShift){ player.running = false}
-            if input.key_pressed(VirtualKeyCode::F3) {debug_flag = !debug_flag}
+            if input.key_held(window::VirtualKeyCode::W) {player.walk(player::Direction::Up)}
+            if input.key_held(window::VirtualKeyCode::A) {player.walk(player::Direction::Left)}
+            if input.key_held(window::VirtualKeyCode::S) {player.walk(player::Direction::Down)}
+            if input.key_held(window::VirtualKeyCode::D) {player.walk(player::Direction::Right)}
+            if input.key_pressed(window::VirtualKeyCode::Space){player.jump()}
+            if input.key_pressed(window::VirtualKeyCode::LShift) {player.running = true} 
+            else if input.key_released(window::VirtualKeyCode::LShift){ player.running = false}
+            if input.key_pressed(window::VirtualKeyCode::F3) {debug_flag = !debug_flag}
             
             if let Some(factor) = input.scale_factor_changed() {                                                            //if window dimensions changed
                 hidpi_factor = factor;                                                                                      //update hidpi_factor
