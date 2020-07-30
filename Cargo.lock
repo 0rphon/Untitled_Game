@@ -360,7 +360,7 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 [[package]]
 name = "engine"
 version = "0.1.0"
-source = "git+https://github.com/0rphon/Untitled_Engine#8662b9899ae0d1e1438a9b041aed66a29993b237"
+source = "git+https://github.com/0rphon/Untitled_Engine#d743419d24d66d1ce49b28260fa6805ea348fc0b"
 dependencies = [
  "image",
  "pixels",
