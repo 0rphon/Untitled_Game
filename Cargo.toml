@@ -10,3 +10,6 @@ edition = "2018"
 engine = {git = "https://github.com/0rphon/Untitled_Engine"}
 spin_sleep = "1.0.0"
 rand = "0.7.3"
+
+[profile.dev]
+opt-level = 3
