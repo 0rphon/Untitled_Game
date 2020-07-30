@@ -15,7 +15,7 @@ pub struct Chunk {                      //world chunk object
 impl Chunk {
     ///generates a random colored chunk\
     ///that contains a 2d vector
-    fn _gen_test(chunk_coords: (isize,isize), rng: &mut StdRng, chunk_width: usize, chunk_height: usize) -> Self{            //generates new chunk with random color
+    fn _gen_test(chunk_coords: (isize,isize), rng: &mut StdRng, chunk_width: usize, chunk_height: usize) -> Self{
         let mut data = vec![vec![Particle::new([0;4]); chunk_width]; chunk_height]; //generate black chunk
         let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                               //generate random color values
         for y in 0..data.len() {                                                    //for y in data vec
@@ -35,25 +35,26 @@ impl Chunk {
         }
     }
 
+    ///generates chunk using perlin noise
     fn gen_perlin(chunk_coords: (isize, isize), generator: Perlin, chunk_width: usize, chunk_height: usize) -> Self {
-        let mut data = vec!(vec!(Particle::new([0;4]); chunk_width); chunk_height);
-        for y in 0..data.len() {
-            for x in 0..data[y].len() {
-                let perlx = ((chunk_coords.0 * chunk_width as isize) as f64 + x as f64)/500.0;
-                let perly = ((chunk_coords.1 * chunk_height as isize) as f64 + y as f64 * -1.0)/500.0;      //WHY DOES THIS NEED *-1?? WITHOUT IT IT FLIPS EVERY CHUNKS Y AXIS
+        let mut data = vec!(vec!(Particle::new([0;4]); chunk_width); chunk_height);                 //creates empty vec for particles
+        for y in 0..data.len() {                                                                    //for row in len of chunk
+            for x in 0..data[y].len() {                                                             //for particle in row
+                let perlx = ((chunk_coords.0 * chunk_width as isize) as f64 + x as f64)/500.0;      //calculate perlin x coord
+                let perly = ((chunk_coords.1 * chunk_height as isize) as f64 + y as f64*-1.0)/500.0;//calculate perlin y coord              WHY DOES THIS NEED *-1?? WITHOUT IT IT FLIPS EVERY CHUNKS Y AXIS
                 //let rgba = 255.0 * ((generator.get([perlx,perly])+1.0)/2.0);
-                let rgba = 255.0 * generator.get([perlx,perly]);
-                data[y][x] = Particle::new([rgba as u8;4]);
+                let rgba = 255.0 * generator.get([perlx,perly]);                                    //map noise to shades of grey
+                data[y][x] = Particle::new([rgba as u8;4]);                                         //copy color to particle in chunk x,y
             }
         }
         //BLACK BOX
-        for y in 0..chunk_height/25 {                                               //creates little black box to show upper left of chunk
+        for y in 0..chunk_height/25 {                                                               //creates little black box to show upper left of chunk
             for x in 0..chunk_width/25 {
                 data[y][x].rgba = [0;4];
             }
         }
-        Self {
-            chunk_coords,
+        Self {                                                                                      //return chunk
+            chunk_coords,                                                                           
             data,
         }
     }
@@ -81,22 +82,23 @@ impl Particle {
 ///generates starting area\
 ///whats inside is temporary
 pub fn _init_test_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
-    let mut world: World = Vec::new();                                                //create empty world
-    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                    //for chunk layer coordinate in gen range
-        world.push(Vec::new());                                                                 //push new layer to vec
-        for world_chunk_x in gen_range*-1..gen_range+1 {                                        //for chunk x_pos in gen range
-            world[yi].push(Chunk::_gen_test((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));  //generate chunk and push to layer
+    let mut world: World = Vec::new();                                                                          //create empty world
+    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                  //for chunk layer coordinate in gen range
+        world.push(Vec::new());                                                                                 //push new layer to vec
+        for world_chunk_x in gen_range*-1..gen_range+1 {                                                        //for chunk x_pos in gen range
+            world[yi].push(Chunk::_gen_test((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));   //generate chunk and push to layer
         }                                                             
     }
-    world                                                                                       //return newly generated world
+    world                                                                                                       //return newly generated world
 }
 
+///generates a world of perlin noise
 pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
-    let mut world= Vec::new();
-    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {
-        world.push(Vec::new());
-        for world_chunk_x in gen_range*-1..gen_range+1 {
-            world[yi].push(Chunk::gen_perlin((world_chunk_x, world_chunk_y), generator, chunk_width, chunk_height));
+    let mut world= Vec::new();                                                                                      //creates empty vec to hold world
+    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                      //for y index, y in gen range counting down 
+        world.push(Vec::new());                                                                                     //push new row
+        for world_chunk_x in gen_range*-1..gen_range+1 {                                                            //for chunk in gen range of row
+            world[yi].push(Chunk::gen_perlin((world_chunk_x, world_chunk_y), generator, chunk_width, chunk_height));//gen new perlin chunk and put it there
         }
     }
     world
@@ -104,6 +106,7 @@ pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize
 
 
 
+///gets all pixels visible on screen from world relative to camera position 
 pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
     let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                             //gets coords of camera in loaded chunks
     for (py, y) in (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate() {     //for screen pixel index and particle in range of camera y
@@ -151,9 +154,10 @@ pub fn _get_rng_test(set_seed: bool, seed: &str) -> (StdRng, String) {
     (rng, display_seed)                                                                 //return handle to world rng and seed to be displayed
 }
 
+///gets handle to perlin noise generator
 pub fn get_perlin_generator(set_seed: bool, mut seed: u32) -> Perlin {
-    if !set_seed {                                                                      //if set seed flag not set
-        seed = rand::thread_rng().gen();
+    if !set_seed {                          //if set seed flag not set
+        seed = rand::thread_rng().gen();    //gen random seed
     }
-    Perlin::new().set_seed(seed)
+    Perlin::new().set_seed(seed)            //return Perlin generator
 }
