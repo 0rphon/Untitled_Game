@@ -13,7 +13,7 @@ const ENABLE_DEBUG: bool = true;        //if debug can be toggled
 
 const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
-const GEN_RANGE: isize = 50;             //how far out to gen chunks
+const GEN_RANGE: isize = 25;             //how far out to gen chunks
 const SET_SEED: bool = true;           //if seed should be set
 const SEED: u32 = 8675309;
 
