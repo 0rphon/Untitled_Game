@@ -33,7 +33,7 @@ impl Chunk {
 
 
 
-///cotains all particle data
+///contains all particle data
 #[derive(Clone)]
 pub struct Particle {   //Particle particle data
     pub rgba: [u8;4]    //rgba color code
@@ -75,8 +75,8 @@ pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &Vec<Vec<Chunk>>, camera
             if let Some(c_row) = world.get(cy) {                                                                //attempt to get chunk row
                 if let Some(c) = c_row.get(cx) {                                                                //attempt to get chunk in row
                     screen[py][px] = c.data[ly][lx].rgba;                                                       //copy color of target particle in chunk
-                }
-            }
+                } else {screen[py][px] = [0;4]}                                                                 //if target chunk doesn't exist color black
+            } else {screen[py][px] = [0;4]}                                                                     //if target chunk row doesn't exist color black
         }
     } 
 }
@@ -89,9 +89,9 @@ fn get_local_coord_pair(coords: (usize, usize), chunk_width: usize, chunk_height
 ///calculates local coordinates in world vec from your global position
 ///returns negative if above/left of rendered area 
 fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
-    let (wx, wy) = world[0][0].chunk_coords;
-    let lx = coords.0 - (wx * chunk_width as isize);
-    let ly = (wy * chunk_height as isize) - coords.1;
+    let (wx, wy) = world[0][0].chunk_coords;            //gets coords of first chunk in rendered vec
+    let lx = coords.0 - (wx * chunk_width as isize);    //calculates local x coord based off world coords of first chunk
+    let ly = (wy * chunk_height as isize) - coords.1;   //calculates local y coord based off world coords of first chunk
     (lx, ly)
 }
 

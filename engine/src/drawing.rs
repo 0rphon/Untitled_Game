@@ -1,4 +1,8 @@
 use rusttype::{point, Font, Scale};
+use image::{png, ImageDecoder, AnimationDecoder, ImageError};
+use image::gif::GifDecoder;
+use std::fs::File;
+use std::convert::TryInto;
 
 pub const DEBUG_FONT: &[u8; 19836] = include_bytes!("fonts/debug.ttf");
 
@@ -64,3 +68,95 @@ pub fn draw_text(screen: &mut Screen, coords: (usize, usize), text: &str, font_s
 
 
 
+
+
+///load spritesheet from frames of gif
+pub fn load_spritesheet(path: &str) -> Result<Vec<Vec<Vec<[u8;4]>>>, ImageError> {
+    let f = File::open(path)?;                                          //open spritesheet gif
+    let decoder = GifDecoder::new(f).unwrap();                          //decode gif
+    let frames = decoder.into_frames();                                 //get frames of gif
+    let frames = frames.collect_frames()?;                              //collect frames
+
+    let mut spritesheet: Vec<Vec<Vec<[u8;4]>>> = Vec::new();            //create vec for each frame
+    for (i_img, frame) in frames.iter().enumerate() {                   //for index, frame in frames
+        spritesheet.push(Vec::new());                                   //add vec to spritesheet
+        let buf = frame.clone().into_buffer();                          //clone frame bytes into buffer
+        let width = buf.width() as usize*4;                             //get width of sprite
+        let buf = buf.into_vec();                                       //create vec to hold sprite data
+        for (i_row,row) in buf.chunks(width).enumerate() {              //for index, row in buf
+            spritesheet[i_img].push(Vec::new());                        //create new row vec in sprite data
+            for p in row.chunks(4) {                                    //for pixel in row of bytes
+                spritesheet[i_img][i_row].push(p.try_into().unwrap())   //push pixel to row
+            }
+        }
+    } 
+    Ok(spritesheet)                                                     //return spritesheet
+}
+
+
+
+///loads sprite from png
+pub fn load_sprite(path: &str) -> Result<Vec<Vec<[u8;4]>>, ImageError> {
+    let f = File::open(path)?;                              //open sprite file
+    let decoder = png::PngDecoder::new(f)?;                 //create decoder from sprite file
+    let width = decoder.dimensions().0 as usize*4;          //get sprite byte width
+    let mut buf = vec!(0;decoder.total_bytes() as usize);   //create buf to hold sprite data
+    decoder.read_image(&mut buf)?;                          //read sprite data into buf
+    
+    let mut img: Vec<Vec<[u8;4]>> = Vec::new();             //create img to hold sprite data
+    for (i, row) in buf.chunks(width).enumerate(){          //for row of bytes in buf 
+        img.push(Vec::new());                               //create new vec
+        for p in row.chunks(4) {                            //for pixel in row of bytes
+            img[i].push(p.try_into().unwrap());             //convert bytes to pixel and push
+        }
+    }
+
+    Ok(img)                                                 //return sprite
+}
+
+
+
+///scale spritesheet
+pub fn scale_spritesheet(spritesheet: &Vec<Vec<Vec<[u8;4]>>>, scale: usize) -> Vec<Vec<Vec<[u8;4]>>> {
+    let mut scaled_spritesheet = Vec::new();                //create var to hold scaled sprites
+    for frame in spritesheet {                              //for each frame in spritesheet
+        scaled_spritesheet.push(scale_sprite(frame, scale));//scale sprite
+    }       
+    scaled_spritesheet                                      //return scaled spritesheet
+}
+
+
+
+///scales sprite
+pub fn scale_sprite(sprite: &Vec<Vec<[u8;4]>>, scale: usize) -> Vec<Vec<[u8;4]>>{
+    let mut scaled_sprite = Vec::new();                 //create scaled_sprite to hold sprite data
+    for row in sprite {                                 //for each row in sprite
+        for _ in 0..scale {                             //for scale factor times
+            scaled_sprite.push(Vec::new());             //push a new row to scaled_sprite
+            let i = scaled_sprite.len()-1;              //get index of new row in scaled_sprite
+            for x in row {                              //for pixel in row of sprite
+                for _ in 0..scale {                     //for scale factor times
+                    scaled_sprite[i].push(x.clone());   //push pixel to new row
+                }
+            }
+        }
+    }
+    scaled_sprite                                       //return scaled_sprite
+}
+
+
+
+///draws sprite to screen, ignoring transparent pixels
+pub fn draw_sprite(screen: &mut Vec<Vec<[u8;4]>>, sprite: &Vec<Vec<[u8;4]>>, coords: (usize, usize)) {
+    for (yi, row) in sprite.iter().enumerate() {                            //for row index, row
+        for (xi, pixel) in row.iter().enumerate() {                         //for column index, pixel
+            if pixel[3] != 0 {                                              //if pixel not transparent
+                if let Some(scr_row) = screen.get_mut(coords.1+yi) {        //check if row exists on screen
+                    if let Some(scr_pixel) = scr_row.get_mut(coords.0+xi) { //check if column exists on screen
+                        *scr_pixel = pixel.clone();                         //if yes push pixel to location
+                    }
+                }
+            }
+        }
+    }
+}

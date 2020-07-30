@@ -1,6 +1,7 @@
 use engine::{drawing, gen, player};
 
-use std::{thread, time};
+use std::time;
+use spin_sleep;
 
 use log::error;
 use pixels::{wgpu::Surface, Pixels, SurfaceTexture};
@@ -14,10 +15,10 @@ const SCREEN_HEIGHT: usize = 528;
 const SCREEN_WIDTH: usize = 960;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
-const TARGET_FPS: u64 = 80;    //VSYNC NOT ACCURATE
+const TARGET_FPS: u64 = 60;
 
 const GAME_TITLE: &str = "Untitled Game v0.001";
-const ENABLE_DEBUG: bool = true;                                    //if debug can be toggled
+const ENABLE_DEBUG: bool = true;        //if debug can be toggled
 
 const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
@@ -30,15 +31,15 @@ const SEED: &str = "TESTSEED";          //seed to set
 fn main() {
     let (mut rng, seed) = gen::get_rng(SET_SEED, SEED);                                                                     //get rng and display_seed
     let world = gen::init_world(&mut rng, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                                            //generate world
-    let mut screen: drawing::Screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);
+    let mut screen: drawing::Screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                       //create blank screen buffer
     let mut player = player::Player::spawn((0,0));                                                                          //spawn player at 0,0
     let mut camera_coords: (isize, isize) = (0,0);                                                                          //set camera location
     let mut debug_flag = false;
 
-    let mut frames = 0;                                                                                                     //frame counter
-    let mut fps_time = clock_ticks::precise_time_s();                                                                       //keeps track of when a second passes
-    let mut fps = 0;                                                                                                        //stores last seconds fps
-    let frame_time = 1000000 / TARGET_FPS;                                                                                  //target fps
+    let mut fps = 0;                                                                                                        //set var to record fps
+    let mut frames = 0;                                                                                                     //set var to record frames this second
+    let target_ft = time::Duration::from_micros(1000000 / TARGET_FPS);                                                      //set target fps
+    let mut second_count = time::Instant::now();                                                                            //start second timer
 
     let event_loop = EventLoop::new();                                                                                      //create event loop obj
     let mut input = WinitInputHelper::new();                                                                                //create WinitIH obj
@@ -60,10 +61,10 @@ fn main() {
     };
 
     event_loop.run(move |event, _, control_flow| {                                                                          //start game loop
-        let frame_start = clock_ticks::precise_time_s();                                                                    //get current loop start time                           VSYNC NOT ACCURATE
+        let frame_time = time::Instant::now();                                                                              //set start of frame time
         if let Event::RedrawRequested(_) = event {                                                                          //if redraw requested
-            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fps, &seed);
-            drawing::flatten(&screen, pixels.get_frame(), SCREEN_WIDTH);//get screen then render screen
+            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fps, &seed);                           //draws new frame to screen buffer
+            drawing::flatten(&screen, pixels.get_frame(), SCREEN_WIDTH);                                                    //render screen
             if pixels                                                                                                       //if rendering error
                 .render()                                                                                                       
                 .map_err(|e| error!("pixels.render() failed: {}", e))
@@ -71,17 +72,16 @@ fn main() {
                 *control_flow = ControlFlow::Exit;                                                                          //break
                 return;
             }                
-            frames+=1;                                                                                                      //inc this seconds frame counter
 
-            if (clock_ticks::precise_time_s() - fps_time) >= 1.0 {                                                          //if second has passed since last second
-                fps = frames;                                                                                               //fps = this seconds frames
-                fps_time = clock_ticks::precise_time_s();                                                                   //reset second time
-                frames = 0;                                                                                                 //reset second frames
+            frames+=1;                                                                                                      //inc frames this second
+            if second_count.elapsed() > time::Duration::from_secs(1) {                                                      //if a second has elapsed
+                fps = frames;                                                                                               //let fps = frames that occurred this second
+                second_count = time::Instant::now();                                                                        //start new second
+                frames = 0;                                                                                                 //reset frames this second to 0
             }
             
-            match (frame_time).checked_sub(((clock_ticks::precise_time_s() - frame_start) * 1000000.0) as u64) {            //if frame took less than target fps time               VSYNC NOT ACCURATE
-                Some(i) => {thread::sleep(time::Duration::from_micros(i))}                                                  //sleep remainder                                       VSYNC NOT ACCURATE
-                None    => {}                                                                                               //else pass                                             VSYNC NOT ACCURATE
+            if let Some(i) = (target_ft).checked_sub(frame_time.elapsed()) {                                                //if target frame time greater than this frames time
+                spin_sleep::sleep(i);                                                                                       //sleep remainder
             }
         }
         
@@ -136,12 +136,11 @@ fn update_camera(camera_coords: &mut (isize,isize), player: &mut player::Player)
 
 ///gets 2D vec of current frame to draw from 4D Vec
 fn draw_screen(screen: &mut drawing::Screen, world: &Vec<Vec<gen::Chunk>>, player: &mut player::Player, camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: &String) {
-    //*screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);
-    gen::get_screen(screen, world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);                                                    //gets visible pixels from world as 2d vec
-    drawing::draw_debug_block(screen, camera_coords, camera_coords, 5, [255;4], SCREEN_WIDTH, SCREEN_HEIGHT);                               //render camera
-    drawing::draw_debug_block(screen, player.coords, camera_coords, 5, [0;4], SCREEN_WIDTH, SCREEN_HEIGHT);                                 //render player
-    if ENABLE_DEBUG && debug_flag {draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_WIDTH)}//if debug flag and debug enabled: render debug
-    drawing::draw_text(screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);          //render game title                         
+    gen::get_screen(screen, world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);       //gets visible pixels from world as 2d vec
+    drawing::draw_debug_block(screen, camera_coords, camera_coords, 5, [255;4], SCREEN_WIDTH, SCREEN_HEIGHT);   //render camera
+    drawing::draw_debug_block(screen, player.coords, camera_coords, 5, [0;4], SCREEN_WIDTH, SCREEN_HEIGHT);     //render player
+    if ENABLE_DEBUG && debug_flag {draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_WIDTH)}    //if debug flag and debug enabled: render debug
+    drawing::draw_text(screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);  //render game title                         
 }
 
 
@@ -165,7 +164,7 @@ pub fn draw_debug_screen(screen: &mut drawing::Screen, player: &mut player::Play
 
 
 fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player) {
-    player.update_location();
+    player.update_location();                                                                           //update player location
     update_camera(camera_coords, player);                                                               //move camera towards player
 }
 
