@@ -8,8 +8,8 @@ edition = "2018"
 
 [dependencies]
 engine = {path = "D:\\coding\\Game\\Untitled_Engine"}
-spin_sleep = "1.0.0"
 rand = "0.7.3"
+noise = "0.6.0"
 
 [profile.dev]
 opt-level = 3

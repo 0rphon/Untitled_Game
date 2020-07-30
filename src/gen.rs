@@ -1,5 +1,10 @@
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use rand::distributions::Alphanumeric;
+use noise::{NoiseFn, Perlin, Seedable};
+
+
+pub type World = Vec<Vec<Chunk>>;
+
 
 ///contains chunk data
 pub struct Chunk {                      //world chunk object
@@ -10,7 +15,7 @@ pub struct Chunk {                      //world chunk object
 impl Chunk {
     ///generates a random colored chunk\
     ///that contains a 2d vector
-    fn gen_chunk(chunk_coords: (isize,isize), rng: &mut StdRng, chunk_width: usize, chunk_height: usize) -> Self{            //generates new chunk with random color
+    fn _gen_test(chunk_coords: (isize,isize), rng: &mut StdRng, chunk_width: usize, chunk_height: usize) -> Self{            //generates new chunk with random color
         let mut data = vec![vec![Particle::new([0;4]); chunk_width]; chunk_height]; //generate black chunk
         let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                               //generate random color values
         for y in 0..data.len() {                                                    //for y in data vec
@@ -27,6 +32,29 @@ impl Chunk {
         Self{                                                                       //return instance of chunk
             chunk_coords,
             data
+        }
+    }
+
+    fn gen_perlin(chunk_coords: (isize, isize), generator: Perlin, chunk_width: usize, chunk_height: usize) -> Self {
+        let mut data = vec!(vec!(Particle::new([0;4]); chunk_width); chunk_height);
+        for y in 0..data.len() {
+            for x in 0..data[y].len() {
+                let perlx = ((chunk_coords.0 * chunk_width as isize) as f64 + x as f64)/500.0;
+                let perly = ((chunk_coords.1 * chunk_height as isize) as f64 + y as f64 * -1.0)/500.0;      //WHY DOES THIS NEED *-1?? WITHOUT IT IT FLIPS EVERY CHUNKS Y AXIS
+                //let rgba = 255.0 * ((generator.get([perlx,perly])+1.0)/2.0);
+                let rgba = 255.0 * generator.get([perlx,perly]);
+                data[y][x] = Particle::new([rgba as u8;4]);
+            }
+        }
+        //BLACK BOX
+        for y in 0..chunk_height/25 {                                               //creates little black box to show upper left of chunk
+            for x in 0..chunk_width/25 {
+                data[y][x].rgba = [0;4];
+            }
+        }
+        Self {
+            chunk_coords,
+            data,
         }
     }
 }
@@ -52,22 +80,31 @@ impl Particle {
 
 ///generates starting area\
 ///whats inside is temporary
-pub fn init_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> Vec<Vec<Chunk>> {
-    let mut world: Vec<Vec<Chunk>> = Vec::new();                                                //create empty world
-    let mut loaded_chunk_y = 0;                                                                 //create y index counter
-    for world_chunk_y in (gen_range*-1..gen_range+1).rev() {                                    //for chunk layer coordinate in gen range
+pub fn _init_test_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
+    let mut world: World = Vec::new();                                                //create empty world
+    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                    //for chunk layer coordinate in gen range
         world.push(Vec::new());                                                                 //push new layer to vec
         for world_chunk_x in gen_range*-1..gen_range+1 {                                        //for chunk x_pos in gen range
-            world[loaded_chunk_y].push(Chunk::gen_chunk((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));  //generate chunk and push to layer
-        }
-        loaded_chunk_y+=1;                                                                      //inc y layer
+            world[yi].push(Chunk::_gen_test((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));  //generate chunk and push to layer
+        }                                                             
     }
     world                                                                                       //return newly generated world
 }
 
+pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
+    let mut world= Vec::new();
+    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {
+        world.push(Vec::new());
+        for world_chunk_x in gen_range*-1..gen_range+1 {
+            world[yi].push(Chunk::gen_perlin((world_chunk_x, world_chunk_y), generator, chunk_width, chunk_height));
+        }
+    }
+    world
+}
 
 
-pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
+
+pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
     let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                             //gets coords of camera in loaded chunks
     for (py, y) in (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate() {     //for screen pixel index and particle in range of camera y
         for (px, x) in (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate() {   //for screen pixel index and particle in range of camera x
@@ -88,7 +125,7 @@ fn get_local_coord_pair(coords: (usize, usize), chunk_width: usize, chunk_height
 
 ///calculates local coordinates in world vec from your global position
 ///returns negative if above/left of rendered area
-fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
+fn get_local_coords(world: &World, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
     let (wx, wy) = world[0][0].chunk_coords;            //gets coords of first chunk in rendered vec
     let lx = coords.0 - (wx * chunk_width as isize);    //calculates local x coord based off world coords of first chunk
     let ly = (wy * chunk_height as isize) - coords.1;   //calculates local y coord based off world coords of first chunk
@@ -96,7 +133,7 @@ fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width
 }
 
 ///handle seeding of world
-pub fn get_rng(set_seed: bool, seed: &str) -> (StdRng, String) {
+pub fn _get_rng_test(set_seed: bool, seed: &str) -> (StdRng, String) {
     let mut full_seed = seed.to_string();                                               //set full_seed as supplied seed
     let mut display_seed = seed.to_string();                                            //set seed to display as supplied seed
     if !set_seed {                                                                      //if set seed flag not set
@@ -112,4 +149,11 @@ pub fn get_rng(set_seed: bool, seed: &str) -> (StdRng, String) {
     }
     let rng: StdRng = SeedableRng::from_seed(bytes_seed);                               //set world rng seed
     (rng, display_seed)                                                                 //return handle to world rng and seed to be displayed
+}
+
+pub fn get_perlin_generator(set_seed: bool, mut seed: u32) -> Perlin {
+    if !set_seed {                                                                      //if set seed flag not set
+        seed = rand::thread_rng().gen();
+    }
+    Perlin::new().set_seed(seed)
 }
