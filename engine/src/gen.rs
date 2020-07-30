@@ -67,6 +67,35 @@ pub fn init_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_
 
 
 
+pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &Vec<Vec<Chunk>>, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
+    let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                             //gets coords of camera in loaded chunks
+    for (py, y) in (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate() {     //for screen pixel index and particle in range of camera y
+        for (px, x) in (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate() {   //for screen pixel index and particle in range of camera x
+            let ((cx,cy),(lx,ly)) = get_local_coord_pair((y as usize,x as usize), chunk_width, chunk_height);   //get chunk xy ald inner xy from local xy
+            if let Some(c_row) = world.get(cy) {                                                                //attempt to get chunk row
+                if let Some(c) = c_row.get(cx) {                                                                //attempt to get chunk in row
+                    screen[py][px] = c.data[ly][lx].rgba;                                                       //copy color of target particle in chunk
+                }
+            }
+        }
+    } 
+}
+
+///calculates chunk (x,y) and internal (x,y) from local coordinates
+fn get_local_coord_pair(coords: (usize, usize), chunk_width: usize, chunk_height: usize) -> ((usize, usize),(usize, usize)) {
+    ((coords.0/chunk_width, coords.1/chunk_height),(coords.0%chunk_width, coords.1%chunk_height))
+}
+
+///calculates local coordinates in world vec from your global position
+///returns negative if above/left of rendered area 
+fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
+    let (wx, wy) = world[0][0].chunk_coords;
+    let lx = coords.0 - (wx * chunk_width as isize);
+    let ly = (wy * chunk_height as isize) - coords.1;
+    (lx, ly)
+}
+
+
 ///handle seeding of world
 pub fn get_rng(set_seed: bool, seed: &str) -> (StdRng, String) {
     let mut full_seed = seed.to_string();                                               //set full_seed as supplied seed
