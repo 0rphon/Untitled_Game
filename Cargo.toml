@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-engine = {git = "https://github.com/0rphon/Untitled_Engine"}
+engine = {path = "D:\\coding\\Game\\Untitled_Engine"}
 spin_sleep = "1.0.0"
 rand = "0.7.3"
 

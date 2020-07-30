@@ -1,9 +1,6 @@
 mod player;
 mod gen;
-use engine::{drawing, window};
-
-use std::time;
-use spin_sleep;
+use engine::{drawing, game};
 
 const SCREEN_HEIGHT: usize = 528;
 const SCREEN_WIDTH: usize = 960;
@@ -30,64 +27,48 @@ fn main() {
     let mut camera_coords: (isize, isize) = (0,0);                                                                          //set camera location
     let mut debug_flag = false;
 
-    let mut fps = 0;                                                                                                        //set var to record fps
-    let mut frames = 0;                                                                                                     //set var to record frames this second
-    let target_ft = time::Duration::from_micros(1000000 / TARGET_FPS);                                                      //set target fps
-    let mut second_count = time::Instant::now();                                                                            //start second timer
+    let mut fpslock = game::FpsLock::create_lock(TARGET_FPS);                                                               //create fps lock obj
 
-    let (event_loop, mut input, window, mut hidpi_factor, mut pixels) = window::init(GAME_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT);
+    let event_loop = game::EventLoop::new();                                                                                //create event loop obj
+    let mut input = game::WinitInputHelper::new();                                                                          //create input helper obj
+    let mut window = game::Window::init(GAME_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, &event_loop);                              //create window, and pixels buffer
+
 
     event_loop.run(move |event, _, control_flow| {                                                                          //start game loop
-        let frame_time = time::Instant::now();                                                                              //set start of frame time
-        if let window::Event::RedrawRequested(_) = event {                                                                          //if redraw requested
-            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fps, &seed);                           //draws new frame to screen buffer
-            drawing::flatten(&screen, pixels.get_frame(), SCREEN_WIDTH);                                                    //render screen
-            if pixels                                                                                                       //if rendering error
-                .render()                                                                                                       
-                .map_err(|e| panic!("pixels.render() failed: {}", e))
-                .is_err() {
-                *control_flow = window::ControlFlow::Exit;                                                                          //break
-                return;
-            }                
+        fpslock.start_frame();                                                                                              //start frame for fps lock
+        if let game::Event::RedrawRequested(_) = event {                                                                    //if redraw requested
+            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fpslock.get_fps(), &seed);                           //draws new frame to screen buffer
+            drawing::flatten(&screen, window.pixels.get_frame(), SCREEN_WIDTH);                                             //flatten screen to 1D for render
+            window.pixels.render().unwrap();                                                                                //render                                                                                                                 
 
-            frames+=1;                                                                                                      //inc frames this second
-            if second_count.elapsed() > time::Duration::from_secs(1) {                                                      //if a second has elapsed
-                fps = frames;                                                                                               //let fps = frames that occurred this second
-                second_count = time::Instant::now();                                                                        //start new second
-                frames = 0;                                                                                                 //reset frames this second to 0
-            }
-            
-            if let Some(i) = (target_ft).checked_sub(frame_time.elapsed()) {                                                //if target frame time greater than this frames time
-                spin_sleep::sleep(i);                                                                                       //sleep remainder
-            }
+            fpslock.end_frame();
         }
         
         if input.update(event) {                                                                                            //handle input events on loop? not just on event
             
-            if input.key_pressed(window::VirtualKeyCode::Escape) || input.quit() {                                                  //if esc pressed
-                *control_flow = window::ControlFlow::Exit;                                                                          //exit
+            if input.key_pressed(game::VirtualKeyCode::Escape) || input.quit() {                                            //if esc pressed
+                *control_flow = game::ControlFlow::Exit;                                                                    //exit
                 return;
             }
 
-            if input.key_held(window::VirtualKeyCode::W) {player.walk(player::Direction::Up)}
-            if input.key_held(window::VirtualKeyCode::A) {player.walk(player::Direction::Left)}
-            if input.key_held(window::VirtualKeyCode::S) {player.walk(player::Direction::Down)}
-            if input.key_held(window::VirtualKeyCode::D) {player.walk(player::Direction::Right)}
-            if input.key_pressed(window::VirtualKeyCode::Space){player.jump()}
-            if input.key_pressed(window::VirtualKeyCode::LShift) {player.running = true} 
-            else if input.key_released(window::VirtualKeyCode::LShift){ player.running = false}
-            if input.key_pressed(window::VirtualKeyCode::F3) {debug_flag = !debug_flag}
+            if input.key_held(game::VirtualKeyCode::W) {player.walk(player::Direction::Up)}
+            if input.key_held(game::VirtualKeyCode::A) {player.walk(player::Direction::Left)}
+            if input.key_held(game::VirtualKeyCode::S) {player.walk(player::Direction::Down)}
+            if input.key_held(game::VirtualKeyCode::D) {player.walk(player::Direction::Right)}
+            if input.key_pressed(game::VirtualKeyCode::Space){player.jump()}
+            if input.key_pressed(game::VirtualKeyCode::LShift) {player.running = true} 
+            else if input.key_released(game::VirtualKeyCode::LShift){ player.running = false}
+            if input.key_pressed(game::VirtualKeyCode::F3) {debug_flag = !debug_flag}
             
             if let Some(factor) = input.scale_factor_changed() {                                                            //if window dimensions changed
-                hidpi_factor = factor;                                                                                      //update hidpi_factor
+                window.hidpi_factor = factor;                                                                               //update hidpi_factor
             }
             if let Some(size) = input.window_resized() {                                                                    //if window resized
-                pixels.resize(size.width, size.height);                                                                     //resize pixel aspect ratio
+                window.pixels.resize(size.width, size.height);                                                              //resize pixel aspect ratio
             }
 
-            //do world updates
             do_updates(&mut camera_coords, &mut player);
-            window.request_redraw();                                                                                        //request frame redraw
+            window.window.request_redraw();                                                                                 //request frame redraw
         }
     });
 }
@@ -114,17 +95,17 @@ fn update_camera(camera_coords: &mut (isize,isize), player: &mut player::Player)
 ///gets 2D vec of current frame to draw from 4D Vec
 fn draw_screen(screen: &mut drawing::Screen, world: &Vec<Vec<gen::Chunk>>, player: &mut player::Player, camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: &String) {
     gen::get_screen(screen, world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);                                   //gets visible pixels from world as 2d vec
-    drawing::draw_sprite(screen, &player.sprite, gen::get_screen_coords(player.coords, camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT));        //draw player sprite
+    drawing::draw_sprite(screen, &player.sprite, drawing::get_screen_coords(player.coords, camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT));    //draw player sprite
     if ENABLE_DEBUG && debug_flag {                                                                                                         //if debug flag and debug enabled:
         drawing::draw_debug_block(screen,                                                                                                   //render debug block on camera
-                                    gen::get_screen_coords(camera_coords, 
+                                    drawing::get_screen_coords(camera_coords, 
                                                             camera_coords, 
                                                             SCREEN_WIDTH, 
                                                             SCREEN_HEIGHT), 
                                                             5, 
                                                             [255;4]);   
-        drawing::draw_debug_outline(screen,                                                                                                 //render debug outline on player
-                                    gen::get_screen_coords(player.coords, 
+        drawing::draw_debug_box(screen,                                                                                                     //render debug outline on player
+                                    drawing::get_screen_coords(player.coords, 
                                                             camera_coords, 
                                                             SCREEN_WIDTH, 
                                                             SCREEN_HEIGHT), 

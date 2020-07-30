@@ -95,12 +95,6 @@ fn get_local_coords(world: &Vec<Vec<Chunk>>, coords: (isize, isize), chunk_width
     (lx, ly)
 }
 
-pub fn get_screen_coords(obj_coords: (isize, isize), camera_coords: (isize, isize), screen_width: usize, screen_height: usize) -> (isize, isize) {
-    let screen_x = (screen_width/2) as isize - (camera_coords.0-obj_coords.0);          //calc obj x distance from camera
-    let screen_y = (screen_height/2) as isize - (obj_coords.1-camera_coords.1);         //calc obj y distance from camera
-    (screen_x,screen_y)                                                                 //return position on screen
-}
-
 ///handle seeding of world
 pub fn get_rng(set_seed: bool, seed: &str) -> (StdRng, String) {
     let mut full_seed = seed.to_string();                                               //set full_seed as supplied seed
