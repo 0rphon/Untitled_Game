@@ -2,8 +2,8 @@ mod player;
 mod gen;
 use engine::{drawing, game};
 
-const SCREEN_HEIGHT: usize = 528;
-const SCREEN_WIDTH: usize = 960;
+const SCREEN_HEIGHT: usize = 1080;//528;
+const SCREEN_WIDTH: usize = 1920;//960;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
 const TARGET_FPS: u64 = 60_000_000;
@@ -44,7 +44,7 @@ fn main() {
         fpslock.start_frame();                                                                                              //start frame for fps lock
         if let game::Event::RedrawRequested(_) = event {                                                                    //if redraw requested
             draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fpslock.get_fps(), SEED);              //draws new frame to screen buffer
-            drawing::flatten(&screen, window.pixels.get_frame(), SCREEN_WIDTH);                                             //flatten screen to 1D for render
+            drawing::flatten(&screen, window.pixels.get_frame());                                                           //flatten screen to 1D for render
             window.pixels.render().unwrap();                                                                                //render                                                                                                                 
 
             fpslock.end_frame();
@@ -161,24 +161,31 @@ fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player) {
 
 //game currently uses 10%=11% cpu and 62mb memory OLD
 //get_screen optimized from 135fps -> 145fps
+//flatten from 145fps -> 235fps
+//achieved 60fps 1920x1080!
 
 
 fn do_tests() {
     println!("Doing tests");
-    let batch_size = 10_000;
-    old_get_screen_test(batch_size);
+    let batch_size = 1_000;
+    old_test(batch_size);
+    new_test(batch_size);
     panic!("ok");
 }
 
-fn old_get_screen_test(batch_size: u32) {
+fn old_test(batch_size: u32) {
     use std::time::Instant;
 
-    let generator = gen::get_perlin_generator(true, 0);                                                      //get rng and display_seed
-    let world = gen::init_perlin_world(generator, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                     //generate world
-    let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                    //create blank screen buffer
+    let event_loop = game::EventLoop::new();                                                                                //create event loop obj
+    let mut window = game::Window::init(GAME_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, &event_loop);                              //create window, and pixels buffer
+    let screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                    //create blank screen buffer
     let start = Instant::now();
     for _ in 0..batch_size {                                                                                //start loop
-        gen::get_screen(&mut screen, &world, (0,0), SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT); //gets visible pixels from world as 2d vec
+        drawing::flatten(&screen, window.pixels.get_frame());                                             //flatten screen to 1D for render
     }
     println!("old: {:?} {:?}", start.elapsed(), start.elapsed()/batch_size);
+}
+
+fn new_test(batch_size: u32) {
+    println!("{}",batch_size);
 }
