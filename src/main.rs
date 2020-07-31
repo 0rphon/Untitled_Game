@@ -2,8 +2,8 @@ mod player;
 mod gen;
 use engine::{drawing, game};
 
-const SCREEN_HEIGHT: usize = 1080;//528;
-const SCREEN_WIDTH: usize = 1920;//960;
+const SCREEN_HEIGHT: usize = 528;
+const SCREEN_WIDTH: usize = 960;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
 const TARGET_FPS: u64 = 60_000_000;
@@ -156,13 +156,25 @@ fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player) {
 //         data: Particle
 //             rgba: [u8;4]
 
-//gen_chunk = chunk index in vec
-//world_chunk = world coordinates of chunk
+//loaded = index in world vec
+//world = world coords
+//chunk = chunk index
+//inner = local index within chunk
+//abs = absolute coords
+
 
 //game currently uses 10%=11% cpu and 62mb memory OLD
 //get_screen optimized from 135fps -> 145fps
+
 //flatten from 145fps -> 235fps
 //achieved 60fps 1920x1080!
+
+//get_screen lagged with bigger screens
+//1_000 1920x1080 optimized 13.760956ms -> 2.940932ms
+//by 60fps -> 155fps by adding #[inline] above get_screen
+
+//started optimizing at 135fps 960x529
+//ended at 570fps 960x529 OR 155fps 1920x1080
 
 
 fn do_tests() {
@@ -176,16 +188,16 @@ fn do_tests() {
 fn old_test(batch_size: u32) {
     use std::time::Instant;
 
-    let event_loop = game::EventLoop::new();                                                                                //create event loop obj
-    let mut window = game::Window::init(GAME_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, &event_loop);                              //create window, and pixels buffer
-    let screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                    //create blank screen buffer
+    let generator = gen::get_perlin_generator(SET_SEED, SEED);                                                              //get rng and display_seed
+    let world = gen::init_perlin_world(generator, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                                    //generate world
+    let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                    //create blank screen buffer
     let start = Instant::now();
     for _ in 0..batch_size {                                                                                //start loop
-        drawing::flatten(&screen, window.pixels.get_frame());                                             //flatten screen to 1D for render
+        gen::get_screen(&mut screen, &world,(0,0) , SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);                                   //gets visible pixels from world as 2d vec
     }
     println!("old: {:?} {:?}", start.elapsed(), start.elapsed()/batch_size);
 }
 
 fn new_test(batch_size: u32) {
-    println!("{}",batch_size);
+    println!("new: {:?} ", batch_size);
 }

@@ -69,9 +69,7 @@ pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize
 }
 
 ///gets all visible pixels on screen relative camera position in world
-//optimized 10fps by making it check the c_row at cy before checking any chunks at cx
-//optimized more from 3.3ms to 3.0ms by switching from loops to for_each but it seems like you cant really tell in game
-//currently 10_000 loops of 960x528 runs at 3.09ms/per
+#[inline]
 pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
     let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                                 //gets loaded coords of camera in loaded chunks
     (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate().for_each(|(py,y)| {      //for screen pixel index and particle in range of camera loaded y
@@ -89,7 +87,7 @@ pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (
 
 ///calculates local coordinates in world vec from your global position
 ///returns negative if above/left of rendered area
-fn get_local_coords(world: &World, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
+pub fn get_local_coords(world: &World, coords: (isize, isize), chunk_width: usize, chunk_height: usize) -> (isize, isize) {
     let (wx, wy) = world[0][0].chunk_coords;            //gets coords of first chunk in rendered vec
     let lx = coords.0 - (wx * chunk_width as isize);    //calculates local x coord based off world coords of first chunk
     let ly = (wy * chunk_height as isize) - coords.1;   //calculates local y coord based off world coords of first chunk
