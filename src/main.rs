@@ -6,10 +6,11 @@ const SCREEN_HEIGHT: usize = 528;
 const SCREEN_WIDTH: usize = 960;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
-const TARGET_FPS: u64 = 60;
+const TARGET_FPS: u64 = 60_000_000;
 
 const GAME_TITLE: &str = "Untitled Game v0.002";
 const ENABLE_DEBUG: bool = true;        //if debug can be toggled
+const DO_BENCHMARKS: bool = false;
 
 const CHUNK_WIDTH: usize = 256;
 const CHUNK_HEIGHT: usize = 256;
@@ -20,7 +21,11 @@ const SEED: u32 = 8675309;
 
 
 fn main() {
-    //do_tests();
+    if DO_BENCHMARKS {
+        do_tests();
+    }
+
+
     let generator = gen::get_perlin_generator(SET_SEED, SEED);                                                              //get rng and display_seed
     let world = gen::init_perlin_world(generator, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                                    //generate world
     let mut screen: drawing::Screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                       //create blank screen buffer
@@ -154,4 +159,26 @@ fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player) {
 //gen_chunk = chunk index in vec
 //world_chunk = world coordinates of chunk
 
-//game currently uses 10%=11% cpu and 62mb memory
+//game currently uses 10%=11% cpu and 62mb memory OLD
+//get_screen optimized from 135fps -> 145fps
+
+
+fn do_tests() {
+    println!("Doing tests");
+    let batch_size = 10_000;
+    old_get_screen_test(batch_size);
+    panic!("ok");
+}
+
+fn old_get_screen_test(batch_size: u32) {
+    use std::time::Instant;
+
+    let generator = gen::get_perlin_generator(true, 0);                                                      //get rng and display_seed
+    let world = gen::init_perlin_world(generator, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                     //generate world
+    let mut screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                    //create blank screen buffer
+    let start = Instant::now();
+    for _ in 0..batch_size {                                                                                //start loop
+        gen::get_screen(&mut screen, &world, (0,0), SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT); //gets visible pixels from world as 2d vec
+    }
+    println!("old: {:?} {:?}", start.elapsed(), start.elapsed()/batch_size);
+}

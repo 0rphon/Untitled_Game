@@ -31,7 +31,7 @@ impl Chunk {
             }
         }
         Self {                                                                                      //return chunk
-            chunk_coords,                                                                           
+            chunk_coords,
             data,
         }
     }
@@ -59,7 +59,7 @@ impl Particle {
 ///generates a world of perlin noise
 pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
     let mut world= Vec::new();                                                                                      //creates empty vec to hold world
-    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                      //for y index, y in gen range counting down 
+    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                      //for y index, y in gen range counting down
         world.push(Vec::new());                                                                                     //push new row
         for world_chunk_x in gen_range*-1..gen_range+1 {                                                            //for chunk in gen range of row
             world[yi].push(Chunk::gen_perlin((world_chunk_x, world_chunk_y), generator, chunk_width, chunk_height));//gen new perlin chunk and put it there
@@ -70,20 +70,21 @@ pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize
 
 ///gets all visible pixels on screen relative camera position in world
 //optimized 10fps by making it check the c_row at cy before checking any chunks at cx
-//for some reason iterators were slower?
-pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize){
-    let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                                 //gets coords of camera in loaded chunks
-    for (py, y) in (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate() {         //for screen pixel index and particle in range of camera y
-        let (cy, ly) = (y as usize/chunk_height, y as usize%chunk_height);                                          //calculate chunk y and local y
-        if let Some(c_row) = world.get(cy) {                                                                        //if chunk row at cy exists
-            for (px, x) in (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate() {   //for screen pixel index and particle in range of camera x
-                let (cx,lx) = (x as usize/chunk_width, x as usize%chunk_width);                                     //get chunk xy ald inner xy from local xy
+//optimized more from 3.3ms to 3.0ms by switching from loops to for_each but it seems like you cant really tell in game
+//currently 10_000 loops of 960x528 runs at 3.09ms/per
+pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
+    let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                                 //gets loaded coords of camera in loaded chunks
+    (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate().for_each(|(py,y)| {      //for screen pixel index and particle in range of camera loaded y
+        let (cy, ly) = (y as usize/chunk_height, y as usize%chunk_height);                                          //calculate chunk y and inner y from loaded y
+        if let Some(c_row) = world.get(cy) {                                                                        //if chunk row at loaded chunk y exists
+            (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate().for_each(|(px,x)| {//for screen pixel index and particle in range of camera loaded x
+                let (cx,lx) = (x as usize/chunk_width, x as usize%chunk_width);                                     //get loaded chunk x and inner x from loaded x
                 if let Some(c) = c_row.get(cx) {                                                                    //attempt to get chunk in row
                     screen[py][px] = c.data[ly][lx].rgba;                                                           //copy color of target particle in chunk
                 } else {screen[py][px] = [0;4]}                                                                     //if target chunk doesn't exist color black
-            }    
-        } else {screen[py].iter_mut().map(|px| *px = [0;4]).collect()}                                              //if target chunk row doesn't exist color row black
-    }
+            })      
+        } else {screen[py].iter_mut().for_each(|px| *px = [0;4])}                                                   //if target chunk row doesn't exist color row black
+    });
 }
 
 ///calculates local coordinates in world vec from your global position
