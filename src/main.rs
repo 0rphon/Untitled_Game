@@ -2,11 +2,11 @@ mod player;
 mod gen;
 use engine::{drawing, game};
 
-const SCREEN_HEIGHT: usize = 528;
-const SCREEN_WIDTH: usize = 960;
+const SCREEN_HEIGHT: usize = 1080;//528;
+const SCREEN_WIDTH: usize = 1920;//960;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
-const TARGET_FPS: u64 = 60_000_000;
+const TARGET_FPS: u64 = 60;
 
 const GAME_TITLE: &str = "Untitled Game v0.002";
 const ENABLE_DEBUG: bool = true;        //if debug can be toggled
