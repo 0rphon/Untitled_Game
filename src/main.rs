@@ -19,6 +19,20 @@ const SET_SEED: bool = true;           //if seed should be set
 const SEED: u32 = 8675309;
 
 
+struct Mouse {
+    coords: (isize, isize),
+    sprite: Vec<Vec<[u8;4]>>,
+}
+
+impl Mouse {
+    fn new() -> Self {
+        Self {
+            coords: (0,0),
+            sprite: drawing::scale_sprite(&drawing::load_sprite("sprites/mouse.png").unwrap(),4)
+        }
+    }
+}
+
 
 fn main() {
     if DO_BENCHMARKS {
@@ -31,6 +45,7 @@ fn main() {
     let mut screen: drawing::Screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                       //create blank screen buffer
     let mut player = player::Player::spawn((0,0), drawing::load_sprite("sprites/dude.png").unwrap());                       //spawn player at 0,0
     let mut camera_coords: (isize, isize) = (0,0);                                                                          //set camera location
+    let mut mouse = Mouse::new();
     let mut debug_flag = false;
 
     let mut fpslock = game::FpsLock::create_lock(TARGET_FPS);                                                               //create fps lock obj
@@ -38,12 +53,15 @@ fn main() {
     let event_loop = game::EventLoop::new();                                                                                //create event loop obj
     let mut input = game::WinitInputHelper::new();                                                                          //create input helper obj
     let mut window = game::Window::init(GAME_TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, &event_loop);                              //create window, and pixels buffer
+    window.fullscreen();
+    window.window.set_cursor_visible(false);
+    
 
 
     event_loop.run(move |event, _, control_flow| {                                                                          //start game loop
         fpslock.start_frame();                                                                                              //start frame for fps lock
         if let game::Event::RedrawRequested(_) = event {                                                                    //if redraw requested
-            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fpslock.get_fps(), SEED);              //draws new frame to screen buffer
+            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fpslock.get_fps(), SEED, &mouse);      //draws new frame to screen buffer
             drawing::flatten(&screen, window.pixels.get_frame());                                                           //flatten screen to 1D for render
             window.pixels.render().unwrap();                                                                                //render                                                                                                                 
 
@@ -65,6 +83,7 @@ fn main() {
             if input.key_pressed(game::VirtualKeyCode::LShift) {player.running = true} 
             else if input.key_released(game::VirtualKeyCode::LShift){ player.running = false}
             if input.key_pressed(game::VirtualKeyCode::F3) {debug_flag = !debug_flag}
+            if let Some(m) = input.mouse() {mouse.coords = (m.0 as isize, m.1 as isize)};
             
             if let Some(factor) = input.scale_factor_changed() {                                                            //if window dimensions changed
                 window.hidpi_factor = factor;                                                                               //update hidpi_factor
@@ -99,7 +118,7 @@ fn update_camera(camera_coords: &mut (isize,isize), player: &mut player::Player)
 
 
 ///gets 2D vec of current frame to draw from 4D Vec
-fn draw_screen(screen: &mut drawing::Screen, world: &Vec<Vec<gen::Chunk>>, player: &mut player::Player, camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: u32) {
+fn draw_screen(screen: &mut drawing::Screen, world: &Vec<Vec<gen::Chunk>>, player: &mut player::Player, camera_coords: (isize, isize), debug_flag: bool, fps: usize, seed: u32, mouse: &Mouse) {
     gen::get_screen(screen, world,camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT, CHUNK_WIDTH, CHUNK_HEIGHT);                                   //gets visible pixels from world as 2d vec
     drawing::draw_sprite(screen, &player.sprite, drawing::get_screen_coords(player.coords, camera_coords, SCREEN_WIDTH, SCREEN_HEIGHT));    //draw player sprite
     if ENABLE_DEBUG && debug_flag {                                                                                                         //if debug flag and debug enabled:
@@ -120,7 +139,8 @@ fn draw_screen(screen: &mut drawing::Screen, world: &Vec<Vec<gen::Chunk>>, playe
                                     [255,0,0,0]);     
         draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_WIDTH)                                                            //render debug screen
     }                        
-    drawing::draw_text(screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);                              //render game title                         
+    drawing::draw_text(screen, (20,SCREEN_HEIGHT-30), GAME_TITLE, 16.0, [255,255,255,0], drawing::DEBUG_FONT);                              //render game title
+    drawing::draw_sprite(screen, &mouse.sprite, mouse.coords);                         
 }
 
 
