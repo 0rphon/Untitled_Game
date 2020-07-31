@@ -1,5 +1,4 @@
-use rand::{Rng, SeedableRng, rngs::StdRng};
-use rand::distributions::Alphanumeric;
+use rand::Rng;
 use noise::{NoiseFn, Perlin, Seedable};
 
 
@@ -13,28 +12,6 @@ pub struct Chunk {                      //world chunk object
 }
 
 impl Chunk {
-    ///generates a random colored chunk\
-    ///that contains a 2d vector
-    fn _gen_test(chunk_coords: (isize,isize), rng: &mut StdRng, chunk_width: usize, chunk_height: usize) -> Self{
-        let mut data = vec![vec![Particle::new([0;4]); chunk_width]; chunk_height]; //generate black chunk
-        let rgba = [rng.gen(),rng.gen(),rng.gen(),0];                               //generate random color values
-        for y in 0..data.len() {                                                    //for y in data vec
-            for x in 0..data[y].len() {                                             //for x in y
-                data[y][x] = Particle::new(rgba);                                   //update color
-            }
-        }
-        //BLACK BOX
-        for y in 0..chunk_height/25 {                                               //creates little black box to show upper left of chunk
-            for x in 0..chunk_width/25 {
-                data[y][x].rgba = [0;4];
-            }
-        }
-        Self{                                                                       //return instance of chunk
-            chunk_coords,
-            data
-        }
-    }
-
     ///generates chunk using perlin noise
     fn gen_perlin(chunk_coords: (isize, isize), generator: Perlin, chunk_width: usize, chunk_height: usize) -> Self {
         let mut data = vec!(vec!(Particle::new([0;4]); chunk_width); chunk_height);                 //creates empty vec for particles
@@ -79,19 +56,6 @@ impl Particle {
 
 
 
-///generates starting area\
-///whats inside is temporary
-pub fn _init_test_world(rng: &mut StdRng, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
-    let mut world: World = Vec::new();                                                                          //create empty world
-    for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                  //for chunk layer coordinate in gen range
-        world.push(Vec::new());                                                                                 //push new layer to vec
-        for world_chunk_x in gen_range*-1..gen_range+1 {                                                        //for chunk x_pos in gen range
-            world[yi].push(Chunk::_gen_test((world_chunk_x, world_chunk_y), rng, chunk_width, chunk_height));   //generate chunk and push to layer
-        }                                                             
-    }
-    world                                                                                                       //return newly generated world
-}
-
 ///generates a world of perlin noise
 pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize, chunk_height: usize) -> World {
     let mut world= Vec::new();                                                                                      //creates empty vec to hold world
@@ -104,26 +68,22 @@ pub fn init_perlin_world(generator: Perlin, gen_range: isize, chunk_width: usize
     world
 }
 
-
-
-///gets all pixels visible on screen from world relative to camera position 
-pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize) {
-    let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                             //gets coords of camera in loaded chunks
-    for (py, y) in (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate() {     //for screen pixel index and particle in range of camera y
-        for (px, x) in (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate() {   //for screen pixel index and particle in range of camera x
-            let ((cx,cy),(lx,ly)) = get_local_coord_pair((y as usize,x as usize), chunk_width, chunk_height);   //get chunk xy ald inner xy from local xy
-            if let Some(c_row) = world.get(cy) {                                                                //attempt to get chunk row
-                if let Some(c) = c_row.get(cx) {                                                                //attempt to get chunk in row
-                    screen[py][px] = c.data[ly][lx].rgba;                                                       //copy color of target particle in chunk
-                } else {screen[py][px] = [0;4]}                                                                 //if target chunk doesn't exist color black
-            } else {screen[py][px] = [0;4]}                                                                     //if target chunk row doesn't exist color black
-        }
+///gets all visible pixels on screen relative camera position in world
+//optimized 10fps by making it check the c_row at cy before checking any chunks at cx
+//for some reason iterators were slower?
+pub fn get_screen(screen: &mut Vec<Vec<[u8;4]>>, world: &World, camera_coords: (isize, isize), screen_width: usize, screen_height: usize, chunk_width: usize, chunk_height: usize){
+    let camera = get_local_coords(world, camera_coords, chunk_width, chunk_height);                                 //gets coords of camera in loaded chunks
+    for (py, y) in (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate() {         //for screen pixel index and particle in range of camera y
+        let (cy, ly) = (y as usize/chunk_height, y as usize%chunk_height);                                          //calculate chunk y and local y
+        if let Some(c_row) = world.get(cy) {                                                                        //if chunk row at cy exists
+            for (px, x) in (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate() {   //for screen pixel index and particle in range of camera x
+                let (cx,lx) = (x as usize/chunk_width, x as usize%chunk_width);                                     //get chunk xy ald inner xy from local xy
+                if let Some(c) = c_row.get(cx) {                                                                    //attempt to get chunk in row
+                    screen[py][px] = c.data[ly][lx].rgba;                                                           //copy color of target particle in chunk
+                } else {screen[py][px] = [0;4]}                                                                     //if target chunk doesn't exist color black
+            }    
+        } else {screen[py].iter_mut().map(|px| *px = [0;4]).collect()}                                              //if target chunk row doesn't exist color row black
     }
-}
-
-///calculates chunk (x,y) and internal (x,y) from local coordinates
-fn get_local_coord_pair(coords: (usize, usize), chunk_width: usize, chunk_height: usize) -> ((usize, usize),(usize, usize)) {
-    ((coords.0/chunk_width, coords.1/chunk_height),(coords.0%chunk_width, coords.1%chunk_height))
 }
 
 ///calculates local coordinates in world vec from your global position
@@ -135,24 +95,7 @@ fn get_local_coords(world: &World, coords: (isize, isize), chunk_width: usize, c
     (lx, ly)
 }
 
-///handle seeding of world
-pub fn _get_rng_test(set_seed: bool, seed: &str) -> (StdRng, String) {
-    let mut full_seed = seed.to_string();                                               //set full_seed as supplied seed
-    let mut display_seed = seed.to_string();                                            //set seed to display as supplied seed
-    if !set_seed {                                                                      //if set seed flag not set
-        full_seed = rand::thread_rng().sample_iter(&Alphanumeric).take(32).collect();   //generate new 32 char seed
-        display_seed = full_seed.clone();                                               //set display seed to new seed
-    }
-    let mut bytes_seed = [0;32];                                                        //create 32 byte placeholder for seed byte array
-    for i in 0..bytes_seed.len() {                                                      //for index in byte_seed
-        bytes_seed[i] = match full_seed.as_bytes().get(i) {                             //let byte_seed index = try get full_seed byte at index
-            Some(byte) => *byte,                                                        //if valid index return byte
-            None => 0,                                                                  //else return 0
-        }
-    }
-    let rng: StdRng = SeedableRng::from_seed(bytes_seed);                               //set world rng seed
-    (rng, display_seed)                                                                 //return handle to world rng and seed to be displayed
-}
+
 
 ///gets handle to perlin noise generator
 pub fn get_perlin_generator(set_seed: bool, mut seed: u32) -> Perlin {
@@ -161,3 +104,5 @@ pub fn get_perlin_generator(set_seed: bool, mut seed: u32) -> Perlin {
     }
     Perlin::new().set_seed(seed)            //return Perlin generator
 }
+
+

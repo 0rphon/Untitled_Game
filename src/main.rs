@@ -20,6 +20,7 @@ const SEED: u32 = 8675309;
 
 
 fn main() {
+    //do_tests();
     let generator = gen::get_perlin_generator(SET_SEED, SEED);                                                              //get rng and display_seed
     let world = gen::init_perlin_world(generator, GEN_RANGE, CHUNK_WIDTH, CHUNK_HEIGHT);                                    //generate world
     let mut screen: drawing::Screen = vec!(vec!([0;4]; SCREEN_WIDTH); SCREEN_HEIGHT);                                       //create blank screen buffer
@@ -154,6 +155,3 @@ fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player) {
 //world_chunk = world coordinates of chunk
 
 //game currently uses 10%=11% cpu and 62mb memory
-
-#[test]
-fn test_it(){}
