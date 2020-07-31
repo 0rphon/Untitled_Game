@@ -1,3 +1,5 @@
+use crate::gen::*;
+
 pub enum Direction {
     Left,
     Right,
@@ -30,9 +32,13 @@ impl Player {
         }
     }
 
-    pub fn update_location(&mut self) {              
-        self.coords.0 += self.velocity.0 as isize/10;
-        self.coords.1 += self.velocity.1 as isize/10;
+    pub fn update_location(&mut self, world: &World) {                          //need to check for edge of hitbox
+        let tmp_x = self.coords.0 + self.velocity.0 as isize/10;                //create fn called get_hitbox
+        let tmp_y = (self.coords.1 + self.velocity.1 as isize/10)-15;           //then check every coord in vec
+        if !world.check_collision((tmp_x,tmp_y)) {                              //also how do i fix catching? oh god i need to calc the curve dont i...
+            self.coords.0 = tmp_x;
+            self.coords.1 = tmp_y;
+        }
         self.velocity.0 -= self.velocity.0/self.deceleration_unit;
         self.velocity.1 -= self.velocity.1/self.deceleration_unit;
     }
@@ -63,6 +69,6 @@ impl Player {
     }
 
     pub fn jump(&mut self) {
-        self.velocity.1+=100.0;
+        self.velocity.1+=300.0;
     }
 }
