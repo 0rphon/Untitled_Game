@@ -1,3 +1,4 @@
+use engine::drawing;
 use crate::gen::*;
 
 pub enum Direction {
@@ -15,11 +16,11 @@ pub struct Player {
     pub acceleration_speed: f32,
     pub deceleration_unit: f32,
     pub running: bool,
-    pub sprite: Vec<Vec<[u8;4]>>,
+    pub sprite: drawing::Sprite,
 }
 
 impl Player {
-    pub fn spawn(coords: (isize, isize), sprite: Vec<Vec<[u8;4]>>) -> Player {
+    pub fn spawn(coords: (isize, isize), sprite: drawing::Sprite) -> Player {
         Player{
             health: 100,
             coords,

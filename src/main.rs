@@ -19,14 +19,14 @@ const SET_SEED: bool = true;           //if seed should be set
 
 struct Mouse {
     coords: (isize, isize),
-    sprite: Vec<Vec<[u8;4]>>,
+    sprite: drawing::Sprite,
 }
 
 impl Mouse {
     fn new() -> Self {
         Self {
             coords: (0,0),
-            sprite: drawing::scale_sprite(&drawing::load_sprite("sprites/mouse.png").unwrap(),4)
+            sprite: drawing::Sprite::load("sprites/mouse.png").unwrap().scale(4),
         }
     }
 }
@@ -37,7 +37,7 @@ fn main() {
     let mut seed = 0;
     let world = gen::World::new_perlin(CHUNK_WIDTH, CHUNK_HEIGHT, &mut seed, SET_SEED, GEN_RANGE);                               //generate world
     let mut screen= drawing::Screen::new(SCREEN_WIDTH, SCREEN_HEIGHT);                                                      //create blank screen buffer
-    let mut player = player::Player::spawn((0,0), drawing::load_sprite("sprites/dude.png").unwrap());                       //spawn player at 0,0
+    let mut player = player::Player::spawn((0,0), drawing::Sprite::load("sprites/dude.png").unwrap());                       //spawn player at 0,0
     let mut camera_coords: (isize, isize) = (0,0);                                                                          //set camera location
     let mut mouse = Mouse::new();
     let mut debug_flag = false;
@@ -73,7 +73,7 @@ fn main() {
             if input.key_held(game::VirtualKeyCode::A) {player.walk(player::Direction::Left)}
             if input.key_held(game::VirtualKeyCode::S) {player.walk(player::Direction::Down)}
             if input.key_held(game::VirtualKeyCode::D) {player.walk(player::Direction::Right)}
-            if input.key_pressed(game::VirtualKeyCode::Space){player.jump()}
+            if input.key_pressed(game::VirtualKeyCode::Space){player.jump(); player.sprite.flip();}
             if input.key_pressed(game::VirtualKeyCode::LShift) {player.running = true} 
             else if input.key_released(game::VirtualKeyCode::LShift){ player.running = false}
             if input.key_pressed(game::VirtualKeyCode::F3) {debug_flag = !debug_flag}
@@ -117,7 +117,7 @@ fn draw_screen(screen: &mut drawing::Screen, world: &gen::World, player: &mut pl
     screen.draw_sprite(&player.sprite, screen.get_coords(player.coords, camera_coords));                                                    //draw player sprite
     if ENABLE_DEBUG && debug_flag {                                                                                                         //if debug flag and debug enabled:
         screen.draw_debug_block(screen.get_coords(camera_coords, camera_coords), 5, [255;4]);                                               //render debug block on camera
-        screen.draw_debug_box(screen.get_coords(player.coords, camera_coords), (player.sprite[0].len(), player.sprite.len()), [255,0,0,0]); //render debug outline on player  
+        screen.draw_debug_box(screen.get_coords(player.coords, camera_coords), (player.sprite.width, player.sprite.height), [255,0,0,0]); //render debug outline on player  
         draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_WIDTH)                                                            //render debug screen
     }                        
     screen.draw_text((20,SCREEN_HEIGHT-30), GAME_TITLE, 32.0, [255,255,255,0], drawing::DEBUG_FONT);                                        //render game title
