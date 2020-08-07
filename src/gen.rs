@@ -4,32 +4,28 @@ use noise::{NoiseFn, Perlin, Seedable};
 
 pub struct World {
     pub data: Vec<Vec<Chunk>>,
-    pub chunk_width: usize,
-    pub chunk_height: usize,
     _generator: Perlin,
     pub seed: u32,
     _gen_range: isize,
-} 
+}
 
 impl World {
-    pub fn new_perlin(chunk_width: usize, chunk_height: usize, seed: &mut u32, set_seed: bool, gen_range: isize) -> Self{
-        if !set_seed {                          //if set seed flag not set
-            *seed = rand::thread_rng().gen();    //gen random seed
+    pub fn new_perlin(chunk_dim: (usize, usize), seed: &mut u32, set_seed: bool, gen_range: isize) -> Self{
+        if !set_seed {                                                                                  //if set seed flag not set
+            *seed = rand::thread_rng().gen();                                                           //gen random seed
         }
-        let generator = Perlin::new().set_seed(*seed);            //return Perlin generator
+        let generator = Perlin::new().set_seed(*seed);                                                  //return Perlin generator
 
-        let mut data= Vec::new();                                                                                      //creates empty vec to hold world
-        for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                                      //for y index, y in gen range counting down
-            data.push(Vec::new());                                                                                     //push new row
-            for world_chunk_x in gen_range*-1..gen_range+1 {                                                            //for chunk in gen range of row
-                data[yi].push(Chunk::gen_perlin((world_chunk_x, world_chunk_y), generator, chunk_width, chunk_height));//gen new perlin chunk and put it there
+        let mut data= Vec::new();                                                                       //creates empty vec to hold world
+        for (yi, world_chunk_y) in (gen_range*-1..gen_range+1).rev().enumerate() {                      //for y index, y in gen range counting down
+            data.push(Vec::new());                                                                      //push new row
+            for world_chunk_x in gen_range*-1..gen_range+1 {                                            //for chunk in gen range of row
+                data[yi].push(Chunk::gen_perlin((world_chunk_x, world_chunk_y), generator, chunk_dim)); //gen new perlin chunk and put it there
             }
         }
-        
+
         Self {
             data,
-            chunk_width,
-            chunk_height,
             _generator: generator,
             seed: *seed,
             _gen_range: gen_range,
@@ -38,10 +34,10 @@ impl World {
 
     ///calculates local coordinates in world vec from your global position
     ///returns negative if above/left of rendered area
-    pub fn get_local_coords(&self, coords: (isize, isize)) -> (isize, isize) {
-        let (wx, wy) = self.data[0][0].chunk_coords;            //gets coords of first chunk in rendered vec
-        let lx = coords.0 - (wx * self.chunk_width as isize);   //calculates local x coord based off world coords of first chunk
-        let ly = (wy * self.chunk_height as isize) - coords.1;  //calculates local y coord based off world coords of first chunk
+    pub fn get_local_coords(&self, coords: (isize, isize), chunk_dim: (usize, usize)) -> (isize, isize) {
+        let (wx, wy) = self.data[0][0].chunk_coords;    //gets coords of first chunk in rendered vec
+        let lx = coords.0 - (wx * chunk_dim.0 as isize);//calculates local x coord based off world coords of first chunk
+        let ly = (wy * chunk_dim.1 as isize) - coords.1;//calculates local y coord based off world coords of first chunk
         (lx, ly)
     }
 
@@ -51,39 +47,41 @@ impl World {
 
     ///gets all visible pixels on screen relative camera position in world
     #[inline]
-    pub fn get_screen(&self, screen: &mut Vec<Vec<[u8;4]>>, camera_coords: (isize, isize), screen_width: usize, screen_height: usize) {
-        let camera = self.get_local_coords(camera_coords);                                                              //gets loaded coords of camera in loaded chunks
-        (camera.1 - screen_height as isize/2..camera.1 + screen_height as isize/2).enumerate().for_each(|(py,y)| {      //for screen pixel index and particle in range of camera loaded y
-            let (cy, ly) = World::get_local_pair(y, self.chunk_height);                                                 //calculate chunk y and inner y from loaded y
+    pub fn get_screen(&self, screen: &mut Vec<Vec<[u8;4]>>, camera_coords: (isize, isize), screen_dim: (usize, usize), chunk_dim: (usize, usize)) {
+        let camera = self.get_local_coords(camera_coords, chunk_dim);                                                   //gets loaded coords of camera in loaded chunks
+        (camera.1 - screen_dim.1 as isize/2..camera.1 + screen_dim.1 as isize/2).enumerate().for_each(|(py,y)| {        //for screen pixel index and particle in range of camera loaded y
+            let (cy, ly) = World::get_local_pair(y, chunk_dim.1);                                                       //calculate chunk y and inner y from loaded y
             if let Some(c_row) = self.data.get(cy) {                                                                    //if chunk row at loaded chunk y exists
-                (camera.0 - screen_width as isize/2..camera.0 + screen_width as isize/2).enumerate().for_each(|(px,x)| {//for screen pixel index and particle in range of camera loaded x
-                    let (cx,lx) = World::get_local_pair(x, self.chunk_width);                                           //get loaded chunk x and inner x from loaded x
-                    if let Some(c) = c_row.get(cx) {                                                                    //attempt to get chunk in row
-                        screen[py][px] = c.data[ly][lx].rgba;                                                           //copy color of target particle in chunk
-                    } else {screen[py][px] = [0;4]}                                                                     //if target chunk doesn't exist color black
-                })      
+                (camera.0 - screen_dim.0 as isize/2..camera.0 + screen_dim.0 as isize/2).enumerate().for_each(|(px,x)| {//for screen pixel index and particle in range of camera loaded x
+                    let (cx,lx) = World::get_local_pair(x, chunk_dim.0);                                                //get loaded chunk x and inner x from loaded x
+                    if let Some(c) = c_row.get(cx) {screen[py][px] = c.data[ly][lx].rgba;}                              //if chunk in row then copy color of target particle in chunk
+                    else {screen[py][px] = [0;4]}                                                                       //if target chunk doesn't exist color black
+                })
             } else {screen[py].iter_mut().for_each(|px| *px = [0;4])}                                                   //if target chunk row doesn't exist color row black
         });
     }
 
-    pub fn check_collision(&self, coords: (isize, isize)) -> bool {
-        let (wx,wy) = self.get_local_coords((coords.0,coords.1));
-        let (cx, lx) = World::get_local_pair(wx, self.chunk_width);
-        let (cy, ly) = World::get_local_pair(wy, self.chunk_height);
-        if let Some(c_row) = self.data.get(cy) {
-            if let Some(c) = c_row.get(cx) {
-                if c.data[ly][lx].collision {
-                   return true 
+    pub fn check_collision(&self, hitbox: Vec<(isize, isize)>, chunk_dim: (usize, usize)) -> bool {
+        for (wx,wy) in hitbox {                                     //for coord pair in hitbox vec
+            let (lx,ly) = self.get_local_coords((wx,wy), chunk_dim);//get local coords
+            let (lcx, inx) = World::get_local_pair(lx, chunk_dim.0);//get loaded x chunk and internal x
+            let (lcy, iny) = World::get_local_pair(ly, chunk_dim.1);//get loaded y chunk and internal y
+            if let Some(c_row) = self.data.get(lcy) {               //if row valid
+                if let Some(c) = c_row.get(lcx) {                   //and column valid
+                    if c.data[iny][inx].collision {                 //if x,y has collision
+                       return true                                  //return true
+                    }
                 }
-            } 
+            }
         }
-        false
+        false                                                       //if none had collision return false
     }
 }
 
 
 
 ///contains chunk data
+#[derive(Clone)]
 pub struct Chunk {                      //world chunk object
     pub chunk_coords: (isize,isize),    //chunk coordinates
     pub data: Vec<Vec<Particle>>,       //chunk Particle data
@@ -91,12 +89,12 @@ pub struct Chunk {                      //world chunk object
 
 impl Chunk {
     ///generates chunk using perlin noise
-    fn gen_perlin(chunk_coords: (isize, isize), generator: Perlin, chunk_width: usize, chunk_height: usize) -> Self {
-        let mut data = vec!(vec!(Particle::new([0;4], false); chunk_width); chunk_height);              //creates empty vec for particles
+    fn gen_perlin(chunk_coords: (isize, isize), generator: Perlin, chunk_dim: (usize, usize)) -> Self {
+        let mut data = vec!(vec!(Particle::new([0;4], false); chunk_dim.0); chunk_dim.1);               //creates empty vec for particles
         for y in 0..data.len() {                                                                        //for row in len of chunk
 
             let gen_depth = {                                                                           //generates number based off depth that slowly climb's from -1 up to 0.1
-                let mut depth = (((chunk_coords.1*chunk_height as isize) as f64-y as f64)/1000.0)*-1.0; //  this makes it so caves don't generate at the surface
+                let mut depth = (((chunk_coords.1*chunk_dim.1 as isize) as f64-y as f64)/1000.0)*-1.0;  //  this makes it so caves don't generate at the surface
                 depth = depth - 1.0;
                 if depth > 0.1 {
                     0.1
@@ -104,8 +102,8 @@ impl Chunk {
             };
 
             for x in 0..data[y].len() {                                                                 //for particle in row
-                let perlx = ((chunk_coords.0 * chunk_width as isize) as f64 + x as f64)/500.0;          //set coords for perlin noise
-                let perly = ((chunk_coords.1 * chunk_height as isize) as f64 - y as f64)/500.0;
+                let perlx = ((chunk_coords.0 * chunk_dim.0 as isize) as f64 + x as f64)/500.0;          //set coords for perlin noise
+                let perly = ((chunk_coords.1 * chunk_dim.1 as isize) as f64 - y as f64)/500.0;
                 let noise = generator.get([perlx,perly]);                                               //get noise for chunk
 
                 let mut ground = 0;                                                                     //sets ground level default to 0 (always above)
@@ -123,12 +121,12 @@ impl Chunk {
             }
         }
         //BLACK BOX
-        //for y in 0..chunk_height/25 {                                                               //creates little black box to show upper left of chunk
+        //for y in 0..chunk_height/25 {                                                                 //creates little black box to show upper left of chunk
         //    for x in 0..chunk_width/25 {
         //        data[y][x].rgba = [0;4];
         //    }
         //}
-        Self {                                                                                      //return chunk
+        Self {                                                                                          //return chunk
             chunk_coords,
             data,
         }
