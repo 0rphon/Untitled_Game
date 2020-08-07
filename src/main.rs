@@ -1,3 +1,6 @@
+#![feature(test)]
+extern crate test;
+
 mod player;
 mod gen;
 use engine::{drawing, game};
@@ -185,3 +188,58 @@ fn do_updates(camera_coords: &mut (isize, isize), player: &mut player::Player, w
 
 //de-optimized when i passed get_screen non constant chunk dimensions. caused full div operations to be compiled and ruined inlining
 //re-optimized by changing chunk and screen coords to tuples and passing directly instead of in struct
+
+
+
+mod tests {
+    use super::*;
+    #[allow(unused_imports)]
+    use test::Bencher;
+
+    #[bench]
+    fn bench_draw_screen(b: &mut Bencher) {
+        let mut seed = 0;
+        let world = gen::World::new_perlin(CHUNK_DIM, &mut seed, SET_SEED, GEN_RANGE);
+        let mut screen= drawing::Screen::new(SCREEN_DIM.0, SCREEN_DIM.1);
+        let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        let camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));
+        let mouse = Mouse::new();
+        let debug_flag = false;
+        let fpslock = game::FpsLock::create_lock(TARGET_FPS);
+        b.iter(||
+            draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fpslock.get_fps(), seed, &mouse)
+        );
+    }
+
+    #[bench]
+    fn bench_get_screen(b: &mut Bencher) {
+        let mut seed = 0;
+        let world = gen::World::new_perlin(CHUNK_DIM, &mut seed, SET_SEED, GEN_RANGE);
+        let mut screen= drawing::Screen::new(SCREEN_DIM.0, SCREEN_DIM.1);
+        let camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));
+        b.iter(||
+            world.get_screen(&mut screen.buf, camera_coords, SCREEN_DIM, CHUNK_DIM)
+        );
+    }
+
+    #[bench]
+    fn bench_update_location(b: &mut Bencher) {
+        let mut seed = 0;
+        let world = gen::World::new_perlin(CHUNK_DIM, &mut seed, SET_SEED, GEN_RANGE);
+        let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        b.iter(||{
+            player.walk(player::Direction::Right);
+            player.update_location(&world, CHUNK_DIM);                                                        
+        });
+    }
+
+    #[bench]
+    fn bench_update_camera(b: &mut Bencher) {
+        let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        let mut camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));
+        b.iter(||{
+            player.walk(player::Direction::Right);
+            update_camera(&mut camera_coords, &mut player);
+        });
+    }
+}
