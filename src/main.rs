@@ -3,7 +3,7 @@ extern crate test;
 
 mod player;
 mod gen;
-use engine::{drawing, game};
+use engine::{drawing, game, sprite};
 
 const SCREEN_DIM: (usize, usize) = (1920,1080);//960, 528;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
@@ -19,14 +19,14 @@ const SET_SEED: bool = true;            //if seed should be set
 
 struct Mouse {
     coords: (isize, isize),
-    sprite: drawing::Sprite,
+    sprite: sprite::Sprite,
 }
 
 impl Mouse {
     fn new() -> Self {
         Self {
             coords: (0,0),
-            sprite: drawing::Sprite::load("sprites/mouse.png").unwrap().scale(4),
+            sprite: sprite::Sprite::load("sprites/mouse.png").unwrap().scale(4),
         }
     }
 }
@@ -36,7 +36,7 @@ fn main() {
     let mut seed = 0;
     let world = gen::World::new_perlin(CHUNK_DIM, &mut seed, SET_SEED, GEN_RANGE);                                          //generate world
     let mut screen= drawing::Screen::new(SCREEN_DIM.0, SCREEN_DIM.1);                                                       //create blank screen buffer
-    let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());         //spawn player at 0,0
+    let mut player = player::Player::spawn((0,0), sprite::Spritesheet::load("sprites/america.gif", 500).unwrap());          //spawn player at 0,0
     let mut camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));                      //set camera location
     let mut mouse = Mouse::new();
     let mut debug_flag = false;
@@ -201,7 +201,7 @@ mod tests {
         let mut seed = 0;
         let world = gen::World::new_perlin(CHUNK_DIM, &mut seed, SET_SEED, GEN_RANGE);
         let mut screen= drawing::Screen::new(SCREEN_DIM.0, SCREEN_DIM.1);
-        let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        let mut player = player::Player::spawn((0,0), sprite::Spritesheet::load("sprites/america.gif", 500).unwrap());
         let camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));
         let mouse = Mouse::new();
         let debug_flag = false;
@@ -226,7 +226,7 @@ mod tests {
     fn bench_update_location(b: &mut Bencher) {
         let mut seed = 0;
         let world = gen::World::new_perlin(CHUNK_DIM, &mut seed, SET_SEED, GEN_RANGE);
-        let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        let mut player = player::Player::spawn((0,0), sprite::Spritesheet::load("sprites/america.gif", 500).unwrap());
         b.iter(||{
             player.walk(player::Direction::Right);
             player.update_location(&world, CHUNK_DIM);                                                        
@@ -235,7 +235,7 @@ mod tests {
 
     #[bench]
     fn bench_update_camera(b: &mut Bencher) {
-        let mut player = player::Player::spawn((0,0), drawing::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        let mut player = player::Player::spawn((0,0), sprite::Spritesheet::load("sprites/america.gif", 500).unwrap());
         let mut camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));
         b.iter(||{
             player.walk(player::Direction::Right);
