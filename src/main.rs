@@ -8,7 +8,7 @@ use engine::{drawing, game, sprite};
 const SCREEN_DIM: (usize, usize) = (1920,1080);//960, 528;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
-const TARGET_FPS: u64 = 60;
+const TARGET_FPS: u64 = 60_000;
 
 const GAME_TITLE: &str = "Untitled Game v0.002";
 const ENABLE_DEBUG: bool = true;        //if debug can be toggled
