@@ -55,7 +55,7 @@ impl World {
                 (camera.0..camera.0 + screen_dim.0 as isize).enumerate().for_each(|(px,x)| {//for screen pixel index and particle in range of camera loaded x
                     let (cx,lx) = World::get_local_pair(x, chunk_dim.0);                    //get loaded chunk x and inner x from loaded x
                     let pos = (py*screen_dim.0+px)*4;
-                    if let Some(c) = c_row.get(cx) {screen[pos..pos+4].copy_from_slice(&c.data[ly][lx].rgba[..])}  //if chunk in row then copy color of target particle in chunk
+                    if let Some(c) = c_row.get(cx) {screen[pos..pos+4].copy_from_slice(&c.data[ly*chunk_dim.0+lx].rgba[..])}  //if chunk in row then copy color of target particle in chunk
                     else {screen[pos..pos+4].copy_from_slice(&[0;4][..])}                                           //if target chunk doesn't exist color black
                 })
             } else {screen[(py*screen_dim.0)*4..(py*screen_dim.0+screen_dim.0)*4].chunks_exact_mut(4).for_each(|px| px.copy_from_slice(&[0;4][..]))}                       //if target chunk row doesn't exist color row black
@@ -69,7 +69,7 @@ impl World {
             let (lcy, iny) = World::get_local_pair(ly, chunk_dim.1);//get loaded y chunk and internal y
             if let Some(c_row) = self.data.get(lcy) {               //if row valid
                 if let Some(c) = c_row.get(lcx) {                   //and column valid
-                    if c.data[iny][inx].collision {                 //if x,y has collision
+                    if c.data[iny*chunk_dim.0+inx].collision {                 //if x,y has collision
                        return true                                  //return true
                     }
                 }
@@ -85,7 +85,7 @@ impl World {
 #[derive(Clone)]
 pub struct Chunk {                      //world chunk object
     pub chunk_coords: (isize,isize),    //chunk coordinates
-    pub data: Vec<Vec<Particle>>,       //chunk Particle data
+    pub data: Vec<Particle>,       //chunk Particle data
 }
 
 impl Chunk {
@@ -129,7 +129,7 @@ impl Chunk {
         //}
         Self {                                                                                          //return chunk
             chunk_coords,
-            data,
+            data: data.into_iter().flatten().collect(),                                                 //BAD BUT IM LAZY RN WILL FIX DURING WORLD GEN IMPL
         }
     }
 }
