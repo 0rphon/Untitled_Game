@@ -47,17 +47,18 @@ impl World {
 
     ///gets all visible pixels on screen relative camera position in world
     #[inline]
-    pub fn get_screen(&self, screen: &mut Vec<[u8;4]>, camera_coords: (isize, isize), screen_dim: (usize, usize), chunk_dim: (usize, usize)) {
+    pub fn get_screen(&self, screen: &mut Vec<u8>, camera_coords: (isize, isize), screen_dim: (usize, usize), chunk_dim: (usize, usize)) {
         let camera = self.get_local_coords(camera_coords, chunk_dim);                       //gets loaded coords of camera in loaded chunks
         (camera.1..camera.1 + screen_dim.1 as isize).enumerate().for_each(|(py,y)| {        //for screen pixel index and particle in range of camera loaded y
             let (cy, ly) = World::get_local_pair(y, chunk_dim.1);                           //calculate chunk y and inner y from loaded y
             if let Some(c_row) = self.data.get(cy) {                                        //if chunk row at loaded chunk y exists
                 (camera.0..camera.0 + screen_dim.0 as isize).enumerate().for_each(|(px,x)| {//for screen pixel index and particle in range of camera loaded x
                     let (cx,lx) = World::get_local_pair(x, chunk_dim.0);                    //get loaded chunk x and inner x from loaded x
-                    if let Some(c) = c_row.get(cx) {screen[py*screen_dim.0+px] = c.data[ly][lx].rgba;}  //if chunk in row then copy color of target particle in chunk
-                    else {screen[py*screen_dim.0+px] = [0;4]}                                           //if target chunk doesn't exist color black
+                    let pos = (py*screen_dim.0+px)*4;
+                    if let Some(c) = c_row.get(cx) {screen[pos..pos+4].copy_from_slice(&c.data[ly][lx].rgba[..])}  //if chunk in row then copy color of target particle in chunk
+                    else {screen[pos..pos+4].copy_from_slice(&[0;4][..])}                                           //if target chunk doesn't exist color black
                 })
-            } else {screen[py*screen_dim.0..py*screen_dim.0+screen_dim.0].iter_mut().for_each(|px| *px = [0;4])}                       //if target chunk row doesn't exist color row black
+            } else {screen[(py*screen_dim.0)*4..(py*screen_dim.0+screen_dim.0)*4].chunks_exact_mut(4).for_each(|px| px.copy_from_slice(&[0;4][..]))}                       //if target chunk row doesn't exist color row black
         });
     }
 

@@ -8,7 +8,7 @@ use engine::{drawing, game, sprite};
 const SCREEN_DIM: (usize, usize) = (1920,1080);//960, 528;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
-const TARGET_FPS: u64 = 60_000;
+const TARGET_FPS: u64 = 60;
 
 const GAME_TITLE: &str = "Untitled Game v0.002";
 const ENABLE_DEBUG: bool = true;        //if debug can be toggled
@@ -115,16 +115,16 @@ fn draw_screen(screen: &mut drawing::Screen, world: &gen::World, player: &mut pl
     world.get_screen(&mut screen.buf, camera_coords, SCREEN_DIM, CHUNK_DIM);                            //gets visible pixels from world as 2d vec
     screen.draw_sprite(&player.sprite.get_sprite(), screen.get_coords(player.coords, camera_coords));   //draw player sprite
     if ENABLE_DEBUG && debug_flag {                                                                     //if debug flag and debug enabled:
-        screen.draw_debug_block(screen.get_coords((camera_coords.0 + (SCREEN_DIM.0 as isize/2), camera_coords.1 - (SCREEN_DIM.1 as isize/2)), camera_coords), 5, [255;4]);           //render debug block on camera
+        screen.draw_debug_block(screen.get_coords((camera_coords.0 + (SCREEN_DIM.0 as isize/2), camera_coords.1 - (SCREEN_DIM.1 as isize/2)), camera_coords), 5, &[255;4]);           //render debug block on camera
         //screen.draw_debug_box(screen.get_coords(player.coords, camera_coords),                          //render debug outline on player
         //                        (player.sprite.get_sprite().width,
         //                        player.sprite.get_sprite().height),
         //                        [255,0,0,0]);
         let hitbox = player.sprite.get_hitbox(player.coords).iter().map(|(x,y)| screen.get_coords((*x,*y), camera_coords)).collect::<Vec<(isize,isize)>>(); //calc hitbox on screen
-        screen.draw_hitbox(hitbox, [0,255,0,0]);                                                        //draw hitbox
+        screen.draw_hitbox(hitbox, &[0,255,0,0]);                                                        //draw hitbox
         draw_debug_screen(screen, player, camera_coords, fps, seed, CHUNK_DIM)                          //render debug screen
     }
-    screen.draw_text((20,SCREEN_DIM.1-30), GAME_TITLE, 32.0, [255,255,255,0], drawing::DEBUG_FONT);     //render game title
+    screen.draw_text((20,SCREEN_DIM.1-30), GAME_TITLE, 32.0, &[255,255,255,0], drawing::DEBUG_FONT);     //render game title
     screen.draw_sprite(&mouse.sprite, mouse.coords);                                                    //draw mouse
 }
 
@@ -132,7 +132,7 @@ fn draw_screen(screen: &mut drawing::Screen, world: &gen::World, player: &mut pl
 ///draws debug text
 pub fn draw_debug_screen(screen: &mut drawing::Screen, player: &mut player::Player, camera_coords: (isize,isize), fps: usize, seed: u32, chunk_dim: (usize, usize)) {
     let size = 32.0;
-    let color = [255,0,0,0];
+    let color = &[255,0,0,0];
     screen.draw_text((20,20), "DEBUG", size, color, drawing::DEBUG_FONT);
     let s = format!("{} FPS", fps);
     screen.draw_text((20,40), &s, size, color, drawing::DEBUG_FONT);
@@ -208,6 +208,24 @@ mod tests {
         let fpslock = game::FpsLock::create_lock(TARGET_FPS);
         b.iter(||
             draw_screen(&mut screen, &world, &mut player, camera_coords, debug_flag, fpslock.get_fps(), seed, &mouse)
+        );
+    }
+
+    #[bench]
+    fn bench_draw_sprite(b: &mut Bencher) {
+        let mut screen= drawing::Screen::new(SCREEN_DIM.0, SCREEN_DIM.1);
+        let player = player::Player::spawn((0,0), sprite::Spritesheet::load("sprites/america.gif", 500).unwrap());
+        let camera_coords: (isize, isize) = (0-(SCREEN_DIM.0 as isize/2),0+(SCREEN_DIM.1 as isize/2));
+        b.iter(||
+            screen.draw_sprite(&player.sprite.get_sprite(), screen.get_coords(player.coords, camera_coords))
+        );
+    }
+
+    #[bench]
+    fn bench_draw_text(b: &mut Bencher) {
+        let mut screen= drawing::Screen::new(SCREEN_DIM.0, SCREEN_DIM.1);
+        b.iter(||
+            screen.draw_text((0,0), "Hello World", 32.0, &[0;4], drawing::DEBUG_FONT)
         );
     }
 
