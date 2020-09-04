@@ -8,7 +8,7 @@ use engine::{drawing, game, sprite};
 const SCREEN_DIM: (usize, usize) = (1920,1080);//960, 528;
 //const ASPECT_RATIO: f32 = 9.0/16.0;
 //const SCREEN_WIDTH: usize = (SCREEN_HEIGHT as f32 / ASPECT_RATIO)as usize;
-const TARGET_FPS: u64 = 60_000;
+const TARGET_FPS: u64 = 60_000; //target should be 60 but i set to 60_000 when optimizing to see uncapped fps
 
 const GAME_TITLE: &str = "Untitled Game v0.002";
 const ENABLE_DEBUG: bool = true;        //if debug can be toggled
@@ -115,7 +115,7 @@ fn draw_screen(screen: &mut drawing::Screen, world: &gen::World, player: &mut pl
     world.get_screen(&mut screen.buf, camera_coords, SCREEN_DIM, CHUNK_DIM);                            //gets visible pixels from world as 2d vec
     screen.draw_sprite(&player.sprite.get_sprite(), screen.get_coords(player.coords, camera_coords));   //draw player sprite
     if ENABLE_DEBUG && debug_flag {                                                                     //if debug flag and debug enabled:
-        screen.draw_debug_block(screen.get_coords((camera_coords.0 + (SCREEN_DIM.0 as isize/2), camera_coords.1 - (SCREEN_DIM.1 as isize/2)), camera_coords), 5, &[255;4]);           //render debug block on camera
+        screen.draw_debug_block(screen.get_coords((camera_coords.0 + (SCREEN_DIM.0 as isize/2), camera_coords.1 - (SCREEN_DIM.1 as isize/2)), camera_coords), 5, &[255;4]);           //render debug block on camera INACCURATE
         //screen.draw_debug_box(screen.get_coords(player.coords, camera_coords),                          //render debug outline on player
         //                        (player.sprite.get_sprite().width,
         //                        player.sprite.get_sprite().height),
